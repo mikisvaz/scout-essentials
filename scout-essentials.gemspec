@@ -81,6 +81,7 @@ Gem::Specification.new do |s|
     "lib/scout/simple_opt/parse.rb",
     "lib/scout/simple_opt/setup.rb",
     "lib/scout/tmpfile.rb",
+    "scout-essentials.gemspec",
     "share/color/color_names",
     "share/color/diverging_colors.hex",
     "share/software/install_helpers",
