@@ -1,0 +1,523 @@
+#vim: ft=sh
+
+[[ -z $SOFTWARE_DIR ]] && SOFTWARE_DIR="$HOME/software"
+OPT_DIR="$SOFTWARE_DIR/opt"; [ -d $OPT_SRC_DIR ] || mkdir -p $OPT_SRC_DIR
+OPT_BIN_DIR="$OPT_DIR/bin"; [ -d $OPT_BIN_DIR ] || mkdir -p $OPT_BIN_DIR
+OPT_SRC_DIR="$SOFTWARE_DIR/src"; [ -d $OPT_SRC_DIR ] || mkdir -p $OPT_SRC_DIR
+OPT_SCM_DIR="$SOFTWARE_DIR/scm"; [ -d $OPT_SCM_DIR ] || mkdir -p $OPT_SCM_DIR
+OPT_JAR_DIR="$OPT_DIR/jars"; [ -d $OPT_JAR_DIR ] || mkdir -p $OPT_JAR_DIR
+OPT_BUILD_DIR="$SOFTWARE_DIR/.build"; [ -d $OPT_BUILD_DIR ] || mkdir -p $OPT_BUILD_DIR
+
+if (false && command -v realpath && realpath --help | grep relative) > /dev/null; then
+	function relative_path(){
+		local basedir=$1
+		local path=$2
+		echo $(realpath --relative-to="$basedir" "$path")
+	}
+else
+	realpath(){
+			OURPWD=$PWD
+			cd "$(dirname "$1")"
+			LINK=$(readlink "$(basename "$1")")
+			while [ "$LINK" ]; do
+				cd "$(dirname "$LINK")" 2> /dev/null
+				LINK=$(readlink "$(basename "$1")")
+			done
+			REALPATH="$PWD/$(basename "$1")"
+			cd "$OURPWD"
+			echo "$REALPATH"
+	}
+
+	function relative_path(){
+		local basedir="$(realpath $1)"
+		local path="$(realpath "$2")"
+    local pre=""
+    basedir=${basedir%.}
+    while [[ ! $path = $basedir* ]]; do
+      pre=${pre}../
+      basedir=$(dirname $basedir)
+    done
+    echo ${pre}${path/$basedir\/} |tr -s '/' '/' 
+	}
+fi
+
+function link(){
+  local source="$1"
+  local target="$2"
+  local rel_source=$(relative_path "$(dirname $target)" "$source")
+
+  [ -h "$target" ] && rm "$target"
+  [ -h "$target" ] || ln -s "$rel_source" "$target"
+}
+
+function expand_path(){
+  name=$(basename $1)
+  dir=$(dirname $1)
+
+  echo "$(cd $dir && pwd)/$name"
+}
+
+function add2file(){
+    file=$1
+    line=$2
+
+    local rel=$(relative_path "$OPT_DIR" "$line")
+    grep "$rel" "$file" || echo "$rel" >> "$file"
+}
+
+#{{{ GET PKG OPT_BUILD_DIR
+
+# From SRC
+get_pkg(){
+    local name="$1"
+    local url="$2"
+
+    if [ ! -f "$OPT_SRC_DIR/$name.pkg" ]; then
+      wget "$url" -O "$OPT_SRC_DIR/$name.pkg"  || wget "$url" -O "$OPT_SRC_DIR/$name.pkg" --no-check-certificate || (rm -f "$OPT_SRC_DIR/$name.pkg"; echo "Error downloading"; exit -1)
+    fi
+}
+
+uncompress_pkg(){
+    local name="$1"
+    local pkg="$OPT_SRC_DIR/$name.pkg"
+
+    local old_pwd="`expand_path $(pwd)`"
+    clean_build
+
+    mkdir -p "$OPT_BUILD_DIR"
+    cd "$OPT_BUILD_DIR"
+
+    (tar xvfz $pkg || tar xvfJ $pkg || tar xvfj $pkg || unzip $pkg || (echo "Error decompressing" & cd & exit -1 ) ) 2> /dev/null
+
+    cd "$old_pwd"
+}
+
+get_src(){
+    local name="$1"
+    local url="$2"
+
+    get_pkg "$name" "$url"
+    uncompress_pkg "$name"
+}
+
+# From SNV
+get_svn(){
+    local name="$1"
+    local url="$2"
+
+    local old_pwd="`expand_path $(pwd)`"
+
+    cd $OPT_SCM_DIR
+    if [ -d "$name" ]; then
+        cd "$name" 
+        svn update
+    else
+        echo svn checkout "$url" "$name"
+        svn checkout "$url" "$name"
+    fi
+
+    clean_build
+
+    cd $OPT_BUILD_DIR
+    link "$OPT_SCM_DIR/$name" "$name"
+
+    cd "$old_pwd"
+
+}
+
+# From GIT
+get_git(){
+    local name="$1"
+    local url="$2"
+
+    if [[ "$url" == *" "* ]]; then
+      version="${url/* /}"
+      url="${url/ */}"
+      echo "Using version $version of repo $url"
+    else
+      version='none'
+    fi
+
+    local old_pwd="`expand_path $(pwd)`"
+
+    cd $OPT_SCM_DIR
+    if [ -d "$name" ]; then
+        cd "$name" 
+
+        if [ ! "$NOWEB" == "true" -a $version == 'none' ]; then
+          git stash
+          git pull origin master
+          git rebase master
+          git stash apply
+          git submodule init
+          git submodule update
+        fi
+    else
+      if [ $version == 'none' ];then
+        git clone --recursive "$url" "$name"
+      else
+        git clone --recursive "$url" "$name" -b $version
+      fi
+
+      cd "$name" 
+      git submodule init
+      git submodule update
+    fi
+
+    clean_build
+
+    cd $OPT_BUILD_DIR
+    link "$OPT_SCM_DIR/$name" "$name"
+
+    cd "$old_pwd"
+}
+
+
+#{{{ BUILD PKG in OPT_BUILD_DIR
+
+clean_build(){
+    rm -Rf $OPT_BUILD_DIR/*
+}
+
+build_dir(){
+    echo $OPT_BUILD_DIR/$(ls $OPT_BUILD_DIR |head -n 1)
+}
+
+compile(){
+    local name=$1; shift
+    local extra="$@"
+
+    if [ -f bootstrap ]; then
+      ./bootstrap
+    fi
+
+    if [ -f Makefile -o -f makefile ]; then
+        make -j 4 || exit -1
+        make install || echo "No install"
+    fi
+
+    [ -f build.xml ] && (ant || exit -1)
+
+    [ -f setup.rb ] && (ruby -Ilib/ setup.rb --prefix="$(opt_dir "$name")" $extra || exit -1)
+
+    [ -f install.rb ] && ruby -Ilib/ install.rb config --prefix="$(opt_dir "$name")" $extra && ruby -Ilib/ install.rb install
+
+    if [ -f setup.py ]; then 
+        python setup.py build &&  python setup.py install --user || exit -1
+        clean_build 
+    fi
+}
+
+prepare_make(){
+    local name=$1; shift
+    local extra="$@"
+
+    local old_pwd="`expand_path $(pwd)`"
+
+    cd "`build_dir`"
+
+    [ -f bootstrap ] && (./bootstrap || exit -1)
+
+    [ -d src -a ! -e CMakeLists.txt -a ! -e Makefile -a ! -e configure ] && cd src
+
+    [ -f bootstrap ] && (./bootstrap || exit -1)
+
+    if [ -f config/m4 ]; then
+        libtoolize --force
+        aclocal
+        autoheader
+    fi
+
+    if [ -f Makefile.am -a ! -f configure ]; then
+        autoreconf
+    fi
+
+    if [ -f aclocal.m4 ]; then
+        autoconf
+    fi
+
+    if [ -f autogen.sh ]; then
+        ./autogen.sh
+    fi
+
+    if [ -f aclocal.m4 ]; then
+        autoreconf -i
+        autoconf
+        automake --add-missing
+    else
+        autoconf
+        automake --add-missing
+    fi
+
+    if [ -f config ]; then
+        ln -s config configure
+    fi
+
+    cd "$old_pwd"
+}
+
+build_make(){
+    local name=$1; shift
+    local extra="$@"
+
+    local old_pwd="`expand_path $(pwd)`"
+    cd "`build_dir`"
+    echo PWD: `pwd`
+    ls
+
+
+    [ -d src -a ! -e CMakeLists.txt -a ! -e Makefile -a ! -e configure ] && cd src
+    [ -d source -a ! -e CMakeLists.txt -a ! -e Makefile -a ! -e configure ] && cd source
+
+    echo "Building with configure $name"
+    if [ "x$extra" != "x" ]; then
+        echo "Extra params: $extra"
+    fi
+
+    if [ ! -f configure ]; then 
+     prepare_make $name
+    fi
+
+    if [ -f configure ]; then 
+        ./configure --prefix="$(opt_dir "$name")" $extra
+        compile "$name" $extra
+        [ -d "$(opt_dir "$name")" ] || move_opt "$name"
+        setup "$name"
+        clean_build
+    else
+        compile "$name" $extra
+        move_opt "$name"
+        setup "$name"
+        clean_build
+    fi
+
+    cd "$old_pwd"
+}
+
+buid_cmake(){
+    local name=$1; shift
+    local extra="$@"
+
+    local old_pwd="`expand_path $(pwd)`"
+    cd "`build_dir`"
+    echo PWD: `pwd`
+    ls
+
+
+    [ -d src -a ! -e CMakeLists.txt -a ! -e Makefile -a ! -e configure ] && cd src
+    [ -d source -a ! -e CMakeLists.txt -a ! -e Makefile -a ! -e configure ] && cd source
+
+    echo "Building with cmake $name"
+    if [ "x$extra" != "x" ]; then
+        echo "Extra params: $extra"
+    fi
+
+    echo "Using cmake"
+    [ -d build ] || mkdir build
+
+    cd build
+    cmake -DMAKE_INSTALL_PREFIX=/ $extra ..
+    if [ ! -f Makefile -a -f ../configure ]; then
+        ../configure --prefix="$(opt_dir "$name")" $extra
+        make -j 4
+        make install || (cd .. ; mv build "$(opt_dir "$name")")
+    else
+        make DESTDIR="$(opt_dir "$name")"  -j 4 && make DESTDIR="$(opt_dir "$name")" install
+    fi
+    cd ..
+
+    if [ ! -d "$(opt_dir "$name")" ]; then 
+        mkdir -p "$(opt_dir "$name")"
+        for subd in bin lib lib64 include pkgdir; do
+            [ -d $subd ] && mv $subd "$(opt_dir "$name")"/$subd
+        done
+    fi
+
+    setup "$name"
+    clean_build
+
+    cd "$old_pwd"
+}
+
+build(){
+    local name=$1; shift
+    local extra="$@"
+
+    echo "Building $name"
+    if [ "x$extra" != "x" ]; then
+        echo "Extra params: $extra"
+    fi
+
+    local old_pwd="`expand_path $(pwd)`"
+    cd "`build_dir`"
+
+    [ -d src -a ! -e CMakeLists.txt -a ! -e Makefile -a ! -e configure ] && cd src
+
+    if [ -f CMakeLists.txt ]; then
+        buid_cmake "$name" $extra
+    else
+        build_make "$name" $extra
+    fi
+
+    cd "$old_pwd"
+}
+
+#{{{ SETUP
+
+is_versioned(){
+    local name="$1"
+    [[ $name =~ : ]]
+}
+
+opt_dir(){
+    local name="$1"
+    if is_versioned "$name"; then
+        local real_name=`echo $1 | sed 's/:.*//'`
+        local version=`echo $1 | sed 's/.*://'`
+        echo "$OPT_DIR/$real_name/$version"
+    else
+        echo "$OPT_DIR/$name"
+    fi
+}
+
+move_opt(){
+    local name="$1"
+    local pkg_dir=$(opt_dir "$name")
+    local source=$(build_dir)
+
+    mkdir -p $(dirname "$pkg_dir")
+    if [ -h "$source" ]; then
+      local real_source=$(realpath "$source")
+      echo link "$real_source" "$pkg_dir"
+      link "$real_source" "$pkg_dir"
+    else
+      mv "$source" "$pkg_dir"
+    fi
+}
+
+setup(){
+    local name="$1"
+    local pkg_dir="`opt_dir \"$name\"`"
+
+    if is_versioned "$name"; then
+        rm -f "$(dirname $pkg_dir)/current"
+        link "$pkg_dir" "$(dirname $pkg_dir)/current"
+        pkg_dir="$(dirname $pkg_dir)/current"
+    fi
+
+    if [ -d "$pkg_dir/bin/" -o -d "$pkg_dir/usr/local/bin/" ]; then
+
+        for exe in ` find "$pkg_dir/bin/" -maxdepth 1 -type f -executable`; do
+            exe=$(basename $exe)
+            rm -f "$OPT_DIR/bin/$exe"
+            link "$pkg_dir/bin/$exe" "$OPT_DIR/bin/$exe" 2>/dev/null
+        done
+
+        for exe in ` find "$pkg_dir/usr/local/bin/" -maxdepth 1 -type f -executable`; do
+            exe=$(basename $exe)
+            rm -f "$OPT_DIR/usr/local/bin/$exe"
+            link "$pkg_dir/usr/local/bin/$exe" "$OPT_DIR/bin/$exe" 2>/dev/null
+        done
+
+
+    else
+        local old_pwd="`expand_path $(pwd)`"
+
+        for exe in ` find "$pkg_dir/" "$pkg_dir/build"  "$pkg_dir/source/" "$pkg_dir/src/" -maxdepth 1 -type f -executable`; do
+            orig=$exe
+            exe=$(basename $exe)
+            echo "EXE $exe"
+            rm -f "$OPT_DIR/bin/$exe"
+            link "$orig" "$OPT_DIR/bin/$exe" 2>/dev/null
+        done
+    fi
+    
+    ([ -d "$pkg_dir/include" ]       && add2file "$OPT_DIR/.c-paths" "$pkg_dir/include")
+    ([ -d "$pkg_dir/lib" ]           && add2file "$OPT_DIR/.ld-paths" "$pkg_dir/lib")
+    ([ -d "$pkg_dir/lib64" ]         && add2file "$OPT_DIR/.ld-paths" "$pkg_dir/lib64")
+    ([ -d "$pkg_dir/lib/pkgconfig" ] && add2file "$OPT_DIR/.pkgconfig-paths" "$pkg_dir/lib/pkgconfig")
+    echo $name setup
+}
+
+#{{{ HELPERS
+
+prepare_pkg(){
+    local name="$1"
+    local url="$2"
+    shift;shift;
+
+    get_pkg "$name" "$url"
+    uncompress_pkg "$name"
+}
+
+install_src(){
+    local name="$1"
+    local url="$2"
+    shift;shift;
+    local extra="$@"
+
+    prepare_pkg "$name" "$url"
+    build "$name"  "$extra"
+}
+
+install_svn(){
+    local name="$1"
+    local url="$2"
+    shift;shift;
+    local extra="$@"
+
+    get_svn "$name" "$url"
+    build "$name" $extra
+}
+
+custom_build(){
+    local name="$1"
+    shift;
+    local cmd="$@"
+
+    echo "Building $name"
+
+    local old_pwd="`expand_path $(pwd)`"
+    cd "`build_dir`"
+    echo `pwd`
+    ls
+
+    eval $cmd
+
+    move_opt "$name"
+    setup "$name"
+    clean_build
+    
+    cd "$old_pwd"
+}
+
+install_git(){
+    local name="$1"
+    local url="$2"
+    shift;shift;
+    local extra="$@"
+    
+    get_git "$name" "$url"
+    build "$name" $extra
+}
+
+install_jar(){
+    local name="$1"
+    local url="$2"
+
+    [ -d  "$OPT_DIR/$name/" ] || mkdir -p  "$OPT_DIR/$name/"
+    wget "$url" -O "$OPT_DIR/$name/$name.jar" || wget "$url" -O "$OPT_DIR/$name/$name.jar" --no-check-certificate || (rm "$OPT_DIR/$name/$name.jar"; exit -1)
+    link "$OPT_DIR/$name/$name.jar" "$OPT_JAR_DIR/$name.jar" 
+}
+
+jar2bin(){
+    local name="$1";shift
+    local extra="$@"
+
+    echo "#!/bin/bash" > $OPT_DIR/bin/$name
+    echo "java $extra -jar '$OPT_JAR_DIR/$name.jar'" >> $OPT_DIR/bin/$name
+
+    chmod +x $OPT_DIR/bin/$name
+}
+
+# vim: ft=sh
