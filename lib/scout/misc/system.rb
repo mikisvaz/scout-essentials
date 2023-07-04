@@ -1,5 +1,3 @@
-require 'sys/proctable'
-
 module Misc
 
   def self.hostname
@@ -9,6 +7,8 @@ module Misc
   end
 
   def self.children(ppid = nil)
+    require 'sys/proctable'
+
     ppid ||= Process.pid
     Sys::ProcTable.ps.select{ |pe| pe.ppid == ppid }
   end

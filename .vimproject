@@ -63,6 +63,13 @@ scout-essentials=/$PWD filter="*.rb *.txt *.md *.conf *.yaml" {
     software.rb
     util.rb
    }
+   config.rb
+   persist.rb
+   persist=persist{
+    open.rb
+    path.rb
+    serialize.rb
+   }
   }
  }
  test=test{

@@ -14,6 +14,9 @@ Juwelier::Tasks.new do |gem|
   gem.authors = ["Miguel Vazquez"]
 
   # dependencies defined in Gemfile
+  
+  gem.add_runtime_dependency 'term-ansicolor'
+  gem.add_runtime_dependency 'yaml'
 end
 Juwelier::RubygemsDotOrgTasks.new
 require 'rake/testtask'
