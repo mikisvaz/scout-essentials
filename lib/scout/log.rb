@@ -12,9 +12,9 @@ module Log
   end
 
   SEVERITY_NAMES ||= begin
-                       names = %w(DEBUG LOW MEDIUM HIGH INFO WARN ERROR NONE )
+                       names = %w(DEBUG LOW MEDIUM HIGH INFO WARN ERROR NONE)
                        names.each_with_index do |name,i|
-                         eval "#{ name } = #{ i }"
+                         Log.const_set name, i
                        end
                        names
                      end
@@ -41,13 +41,17 @@ module Log
     self.severity = MEDIUM
   when 'HIGH'
     self.severity = HIGH
+  when 'WARN'
+    self.severity = WARN
+  when 'ERROR'
+    self.severity = ERROR
+  when 'NONE'
+    self.severity = NONE
   when nil
     self.severity = default_severity
   else
     self.severity = default_severity
   end
-
-
 
   def self.tty_size
     @@tty_size ||= Log.ignore_stderr do
