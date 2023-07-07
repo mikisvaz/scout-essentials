@@ -114,6 +114,10 @@ module Open
   end
   class << self; alias exist? exists? end
 
+  def self.exist_or_link?(file)
+    self.exists?(file) || File.symlink?(file)
+  end
+
   def self.mv(source, target, options = {})
     target = target.find if Path === target
     source = source.find if Path === source

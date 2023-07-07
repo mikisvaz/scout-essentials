@@ -8,8 +8,8 @@ module Misc
     res = nil
     begin
       measure = Benchmark.measure do
-        repeats.times do
-          res = yield
+        repeats.times do |i|
+          res = yield i
         end
       end
       if message

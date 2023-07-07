@@ -2,7 +2,7 @@ require_relative '../indiferent_hash'
 module Path
 
   def self.caller_lib_dir(file = nil, relative_to = ['lib', 'bin'])
-    
+
     if file.nil?
       caller_dup = caller.dup
       while file = caller_dup.shift
@@ -41,7 +41,7 @@ module Path
       sub('{SUBPATH}', path._subpath).
       sub('{BASENAME}', File.basename(path)).
       sub('{PATH}', path).
-      sub('{LIBDIR}', path.libdir || (path.pkgdir.respond_to?(:libdir) && path.pkgdir.libdir) || Path.caller_lib_dir || "NOLIBDIR").
+      sub('{LIBDIR}'){ path.libdir || (path.pkgdir.respond_to?(:libdir) && path.pkgdir.libdir) || Path.caller_lib_dir || "NOLIBDIR" }.
       sub('{MAPNAME}', map_name.to_s).
       sub('{REMOVE}/', '').
       sub('{REMOVE}', '').gsub(/\/+/,'/')
