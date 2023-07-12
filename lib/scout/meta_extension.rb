@@ -68,7 +68,8 @@ module MetaExtension
 
       if new.instance_variables.include?(:@extension_attrs)
         new.instance_variable_get(:@extension_attrs).each do |a|
-          new.remove_instance_variable("@#{a}")
+          var_name = "@#{a}".to_sym
+          new.remove_instance_variable(var_name) if new.instance_variables.include? var_name
         end
         new.remove_instance_variable("@extension_attrs")
       end

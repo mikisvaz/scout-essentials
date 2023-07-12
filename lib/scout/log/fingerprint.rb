@@ -1,5 +1,8 @@
 require 'digest/md5'
 module Log
+  FP_MAX_STRING = 150
+  FP_MAX_ARRAY = 20
+  FP_MAX_HASH = 10
   def self.fingerprint(obj)
     return obj.fingerprint if obj.respond_to?(:fingerprint)
 
@@ -13,9 +16,11 @@ module Log
     when Symbol
       ":" << obj.to_s
     when String
-      if obj.length > 100
+      if obj.length > FP_MAX_STRING
         digest = Digest::MD5.hexdigest(obj)
-        "'" << obj.slice(0,30) << "<...#{obj.length} - #{digest[0..4]}...>" << obj.slice(-10,30)<< "'"
+        middle = "<...#{obj.length} - #{digest[0..4]}...>"
+        s = (FP_MAX_STRING - middle.length) / 2
+        "'" << obj.slice(0,s-1) << middle << obj.slice(-s, obj.length )<< "'"
       else 
         "'" << obj << "'"
       end
@@ -28,13 +33,13 @@ module Log
     when File
       "<File:" + obj.path + ">"
     when Array
-      if (length = obj.length) > 10
+      if (length = obj.length) > FP_MAX_ARRAY
         "[#{length}--" <<  (obj.values_at(0,1, length / 2, -2, -1).collect{|e| fingerprint(e)} * ",") << "]"
       else
         "[" << (obj.collect{|e| fingerprint(e) } * ", ") << "]"
       end
     when Hash
-      if obj.length > 10
+      if obj.length > FP_MAX_HASH
         "H:{"<< fingerprint(obj.keys) << ";" << fingerprint(obj.values) << "}"
       else
         new = "{"

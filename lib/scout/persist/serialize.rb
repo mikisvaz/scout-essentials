@@ -52,7 +52,7 @@ module Persist
     when nil, :string, :text, :file, :stream, :select, :folder
       serialized
     when :path
-      Path.setup(serialized)
+      Path.setup(serialized.strip)
     when :integer
       serialized.to_i
     when :float

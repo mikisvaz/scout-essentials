@@ -9,6 +9,8 @@ module Misc
         #'\'' << obj << '\''
         if Path === obj || ! Open.exists?(obj)
           '\'' << obj << '\''
+        elsif File.directory?(obj)
+          "Directory MD5: #{digest_str(Dir.glob(File.join(obj, "*")))}"
         else
           "File MD5: #{Misc.file_md5(obj)}"
         end
