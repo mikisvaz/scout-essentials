@@ -34,6 +34,10 @@ module Path
     File.directory?(self.find)
   end
 
+  def sub(*args)
+    self.annotate super(*args)
+  end
+
   def dirname
     self.annotate(File.dirname(self))
   end
