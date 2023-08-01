@@ -31,6 +31,7 @@ module Open
   end
 
   def self.wget(url, options = {})
+    options = options[:wget_options] if options.include?(:wget_options)
     if ! (options[:force] || options[:nocache]) && cache_file = in_cache(url, options)
       return file_open(cache_file)
     end
