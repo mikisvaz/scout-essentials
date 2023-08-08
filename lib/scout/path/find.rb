@@ -88,6 +88,19 @@ module Path
     @@map_order = nil
   end
 
+  def self.load_path_maps(filename)
+    Path.setup(filename) unless Path === filename
+    if filename.exist?
+      begin
+        YAML.load(filename.read).each do |where, location|
+          @@path_maps[where.to_sym] = location
+        end
+      rescue
+        Log.error "Error loading search_paths from #{filename}: " << $!.message
+      end
+    end
+  end
+
   def _parts
     @_parts ||= self.split("/")
   end
@@ -95,7 +108,7 @@ module Path
   def _subpath
     @subpath ||= _parts.length > 1 ? _parts[1..-1] * "/" : _parts[0] || ""
   end
-  
+
   def _toplevel
     @toplevel ||= _parts.length > 1 ? _parts[0] : ""
   end
