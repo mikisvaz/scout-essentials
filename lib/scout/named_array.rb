@@ -70,6 +70,13 @@ module NamedArray
     super(pos)
   end
 
+  def []=(key, value)
+    pos = NamedArray.identify_name(@fields, key)
+    return nil if pos.nil?
+    super(pos, value)
+  end
+
+
   def concat(other)
     super(other)
     self.fields.concat(other.fields) if NamedArray === other
