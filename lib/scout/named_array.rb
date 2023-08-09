@@ -130,6 +130,7 @@ module NamedArray
 
   def self.add_zipped(source, new)
     source.zip(new).each do |s,n|
+      next if n.nil?
       s.concat(n)
     end
     source
