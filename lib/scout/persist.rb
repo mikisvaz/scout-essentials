@@ -55,7 +55,13 @@ module Persist
           res = yield
 
           if res.nil?
-            return Persist.load(file, type)
+            if type.nil?
+              Log.debug "Empty result and no persist type; not loading result file"
+              return nil
+            else
+              Log.debug "Empty result; loading #{type} result from file"
+              return Persist.load(file, type)
+            end
           end
 
           Open.rm(file)
