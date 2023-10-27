@@ -3,6 +3,10 @@ module NamedArray
   extend MetaExtension
   extension_attr :fields, :key
 
+  def all_fields
+    [key, fields].compact.flatten
+  end
+
   def self.field_match(field, name)
     if (String === field) && (String === name)
       field == name || 
