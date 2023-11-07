@@ -94,7 +94,7 @@ module Persist
             else
               Log.debug "Failed persistence #{file}"
             end
-          end
+          end unless KeepLocked === $!
           raise $! unless options[:canfail]
         end
         res
