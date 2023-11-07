@@ -49,8 +49,10 @@ module Persist
     type = SERIALIZER if type == :serializer
 
     case type
-    when nil, :string, :text, :file, :stream, :select, :folder
+    when nil, :text, :stream
       serialized
+    when :string, :file, :select, :folder
+      serialized.strip
     when :path
       Path.setup(serialized.strip)
     when :integer
@@ -142,7 +144,11 @@ module Persist
     when :file
       value = Open.read(file)
       value.sub!(/^\./, File.dirname(file)) if value.start_with?("./")
-      value
+      if Misc.is_filename?(value)
+        value
+      else
+        file
+      end
     when :file_array
       Open.read(file).split("\n").collect do |f|
         f.sub!(/^\./, File.dirname(file)) if f.start_with?("./")
@@ -151,7 +157,8 @@ module Persist
     when Hash
       type[file]
     else
-      deserialize(Open.read(file), type)
+      serialized = Open.read(file)
+      deserialize(serialized, type)
     end
   end
 end
