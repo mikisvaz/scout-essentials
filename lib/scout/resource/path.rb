@@ -1,5 +1,6 @@
 module Path
   def produce(force = false)
+    raise @produced if Exception === @produced
     return self if ! force && (Open.exist?(self) || @produced)
     begin
       if Resource === self.pkgdir
@@ -8,14 +9,14 @@ module Path
         false
       end
     rescue ResourceNotFound
-      false
+      @produced = false
     rescue
       message = $!.message
       message = "No exception message" if message.nil? || message.empty?
       Log.warn "Error producing #{self}: #{message}"
       raise $!
     ensure
-      @produced = true
+      @produced = true if @produced.nil?
     end
   end
 
