@@ -144,7 +144,7 @@ module Persist
     when :file
       value = Open.read(file)
       value.sub!(/^\./, File.dirname(file)) if value.start_with?("./")
-      if Misc.is_filename?(value)
+      if Path.is_filename?(value)
         value
       else
         file
