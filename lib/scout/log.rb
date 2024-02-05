@@ -309,6 +309,7 @@ module Log
         end
       end
     end
+    Log::LAST.replace "log"
   end
 
   def self.stack(stack)
