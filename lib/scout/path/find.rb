@@ -69,7 +69,7 @@ module Path
       :cache   => '/cache/{TOPLEVEL}/{PKGDIR}/{SUBPATH}',
       :bulk    => '/bulk/{TOPLEVEL}/{PKGDIR}/{SUBPATH}',
       :lib     => '{LIBDIR}/{TOPLEVEL}/{SUBPATH}',
-      :scout_gear => File.join(Path.caller_lib_dir(__FILE__), "{TOPLEVEL}/{SUBPATH}"),
+      :scout_essentials => File.join(Path.caller_lib_dir(__FILE__), "{TOPLEVEL}/{SUBPATH}"),
       :tmp     => '/tmp/{PKGDIR}/{TOPLEVEL}/{SUBPATH}',
       :default => :user
     })

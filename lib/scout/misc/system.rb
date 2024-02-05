@@ -37,8 +37,8 @@ module Misc
     end
   end
   
-  def self.update_git(gem_name = 'scout-gear')
-    gem_name = 'scout-gear' if gem_name.nil?
+  def self.update_git(gem_name = 'scout-essentials')
+    gem_name = 'scout-essentials' if gem_name.nil?
     dir = File.join(__dir__, '../../../../', gem_name)
     return unless Open.exist?(dir)
     Misc.in_dir dir do
