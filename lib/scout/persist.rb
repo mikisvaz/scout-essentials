@@ -31,7 +31,9 @@ module Persist
   def self.persist(name, type = :serializer, options = {}, &block)
     persist_options = IndiferentHash.pull_keys options, :persist 
     return yield if FalseClass === persist_options[:persist]
+
     file = persist_options[:path] || options[:path] || persistence_path(name, options)
+    no_load = persist_options[:no_load] || options[:no_load]
 
     if type == :memory
       repo = options[:memory] || options[:repo] || MEMORY_CACHE
@@ -47,7 +49,11 @@ module Persist
 
     Open.lock lockfile do |lock|
       if Open.exist?(file) && ! update
-        Persist.load(file, type)
+        if no_load
+          file
+        else
+          Persist.load(file, type)
+        end
       else
         begin
           file = file.find if Path === file
@@ -97,7 +103,12 @@ module Persist
           end unless KeepLocked === $!
           raise $! unless options[:canfail]
         end
-        res
+        
+        if no_load
+          file
+        else
+          res
+        end
       end
     end
   end
