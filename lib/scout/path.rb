@@ -27,7 +27,9 @@ module Path
     @path_maps ||= Path.path_maps.dup
   end
 
-  def join(subpath, prevpath = nil)
+  def join(subpath = nil, prevpath = nil)
+    return self if subpath.nil?
+
     subpath = subpath.to_s if Symbol === subpath
     prevpath = prevpath.to_s if Symbol === prevpath
 
