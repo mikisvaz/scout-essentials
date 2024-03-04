@@ -2,7 +2,7 @@ module MetaExtension
   def self.extended(base)
     meta = class << base; self; end
 
-    base.class_variable_set("@@extension_attrs", []) unless base.class_variables.include?("@@extension_attrs")
+    base.class_variable_set(:@@extension_attrs, []) unless base.class_variables.include?(:@@extension_attrs)
 
     meta.define_method(:extension_attr) do |*attrs|
       self.class_variable_get("@@extension_attrs").concat attrs
@@ -27,6 +27,7 @@ module MetaExtension
       end
       obj = block if obj.nil?
       obj.extend base unless base === obj
+      obj.extension_types << base
 
       attrs = self.class_variable_get("@@extension_attrs")
 
@@ -46,6 +47,10 @@ module MetaExtension
       end
 
       obj
+    end
+
+    base.define_method(:extension_types) do 
+      @extension_types ||= []
     end
 
     base.define_method(:extension_attr_hash) do 
@@ -72,6 +77,10 @@ module MetaExtension
           new.remove_instance_variable(var_name) if new.instance_variables.include? var_name
         end
         new.remove_instance_variable("@extension_attrs")
+      end
+
+      if new.instance_variables.include?(:@extension_types)
+        new.remove_instance_variable("@extension_types")
       end
 
       new

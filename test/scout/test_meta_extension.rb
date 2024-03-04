@@ -76,5 +76,12 @@ class TestMetaExtension < Test::Unit::TestCase
     assert_include str.extension_attr_hash, :code
     assert_include str.extension_attr_hash, :code3
   end
+
+  def test_extension_types
+    str = "String"
+    ExtensionClass.setup(str, :code)
+    assert ExtensionClass === str
+    assert_include str.extension_types, ExtensionClass
+  end
 end
 
