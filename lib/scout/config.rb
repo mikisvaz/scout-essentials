@@ -17,7 +17,7 @@ module Scout::Config
 
   def self.load_file(file)
     Log.debug "Loading config file: #{ file }"
-    TSV.traverse file, :type => :array do |line|
+    Open.read(file).split("\n").each do |line|
       next if line =~ /^#/
       key, value, *tokens = line.strip.split(/\s/)
 
