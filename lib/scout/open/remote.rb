@@ -87,7 +87,12 @@ module Open
   end
 
   def self.download(url, file)
-    CMD.cmd_log(:wget, "'#{url}' -O '#{file}'")
+    begin
+      CMD.cmd_log(:wget, "'#{url}' -O '#{file}'")
+    rescue
+      FileUtils.rm(file) if File.exist?(file)
+      raise $!
+    end
   end
 
   def self.digest_url(url, options = {})
@@ -107,7 +112,7 @@ module Open
       nil
     end
   end
- 
+
   def self.remove_from_cache(url, options = {})
     filename = cache_file(url, options)
     if File.exist? filename
@@ -116,7 +121,7 @@ module Open
       nil
     end
   end
-  
+
   def self.add_cache(url, data, options = {})
     filename = cache_file(url, options)
     Open.sensible_write(filename, data, :force => true)
