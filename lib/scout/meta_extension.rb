@@ -1,20 +1,45 @@
+require_relative 'meta_extension/array'
+
 module MetaExtension
+
+  def self.setup(obj, extension_types, extension_attr_hash)
+    extension_types = [extension_types] unless Array === extension_types
+    extension_types.each do |type|
+      type = Kernel.const_get(type) if String === type
+      type.setup(obj, extension_attr_hash)
+    end
+    obj
+  end
+
   def self.extended(base)
     meta = class << base; self; end
 
-    base.class_variable_set(:@@extension_attrs, []) unless base.class_variables.include?(:@@extension_attrs)
+    base.instance_variable_set(:@extension_attrs, []) unless base.instance_variables.include?(:@extension_attrs)
 
     meta.define_method(:extension_attr) do |*attrs|
-      self.class_variable_get("@@extension_attrs").concat attrs
+      self.instance_variable_get("@extension_attrs").concat attrs
       attrs.each do |a|
         self.attr_accessor a
       end
     end
 
+    class << meta
+      def extension_attrs
+        @extension_attrs ||= []
+      end
+    end
+
+    meta.define_method(:included) do |mod|
+      mod.instance_variable_set(:@extension_attrs, []) unless mod.instance_variables.include?(:@extension_attrs)
+      mod.instance_variable_get(:@extension_attrs).concat self.instance_variable_get(:@extension_attrs)
+    end
+
     meta.define_method(:extended) do |obj|
-      attrs = self.class_variable_get("@@extension_attrs")
+      attrs = base.instance_variable_get("@extension_attrs")
 
       obj.instance_variable_set(:@extension_attrs, []) unless obj.instance_variables.include?(:@extension_attrs)
+      obj.extension_types << base
+
       extension_attrs = obj.instance_variable_get(:@extension_attrs)
       extension_attrs.concat attrs
     end
@@ -27,9 +52,7 @@ module MetaExtension
       end
       obj = block if obj.nil?
       obj.extend base unless base === obj
-      obj.extension_types << base
-
-      attrs = self.class_variable_get("@@extension_attrs")
+      attrs = self.instance_variable_get("@extension_attrs")
 
       return if attrs.nil? || attrs.empty?
 
@@ -49,6 +72,10 @@ module MetaExtension
       obj
     end
 
+    base.define_method(:extension_attrs) do 
+      @extension_attrs ||= []
+    end
+
     base.define_method(:extension_types) do 
       @extension_types ||= []
     end
@@ -61,11 +88,19 @@ module MetaExtension
       attr_hash
     end
 
+    base.define_method(:extension_info) do 
+      extension_attr_hash.merge(extension_types: extension_types)
+    end
+
+    base.define_method(:extended_digest) do
+      Misc.digest([self, extension_info])
+    end
+
     base.define_method(:annotate) do |other|
-      attr_values = @extension_attrs.collect do |a|
-        self.instance_variable_get("@#{a}")
+      extension_types.each do |type|
+        type.setup(other, extension_attr_hash)
       end
-      base.setup(other, *attr_values)
+      other
     end
 
     base.define_method(:purge) do
@@ -96,11 +131,12 @@ module MetaExtension
     when nil
       nil
     when Array
+      obj = obj.purge if is_extended?(obj)
       obj.collect{|e| purge(e) }
     when Hash
       new = {}
       obj.each do |k,v|
-        new[k] = purge(v)
+        new[purge(k)] = purge(v)
       end
       new
     else
