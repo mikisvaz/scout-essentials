@@ -7,6 +7,8 @@ scout-essentials=/$PWD filter="*.rb *.txt *.md *.conf *.yaml" {
    exceptions.rb
    meta_extension.rb
    meta_extension=meta_extension{
+    extended_object.rb
+    extended_module.rb
     array.rb
    }
    misc.rb
