@@ -48,5 +48,12 @@ module MetaExtension
 
       new
     end
+
+    def make_array
+      new = [self]
+      self.annotate(new)
+      new.extend ExtendedArray
+      new
+    end
   end
 end

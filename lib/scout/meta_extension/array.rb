@@ -3,6 +3,10 @@ module ExtendedArray
   module ExtendedArrayItem
     attr_accessor :container, :container_index
   end
+  
+  def self.is_contained?(obj)
+    ExtendedArrayItem === obj
+  end
 
   def annotate_item(obj, position = nil)
     obj = obj.dup if obj.frozen?
