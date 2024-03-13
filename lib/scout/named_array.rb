@@ -9,9 +9,11 @@ module NamedArray
 
   def self.field_match(field, name)
     if (String === field) && (String === name)
-      field == name || 
-        field.start_with?(name) || field.include?("(" + name + ")") ||
-        name.start_with?(field) || name.include?("(" + field + ")")
+      return true if field == name
+      return true if field.include?("(" + name + ")") 
+      return true if name.include?("(" + field + ")")
+      return true if field.start_with?(name + " ")
+      return true if name.start_with?(field + " ")
     else
       field == name
     end
