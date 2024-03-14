@@ -114,7 +114,7 @@ module Persist
         f.puts content
       end
       content
-   else
+    else
       serialized = serialize(content, type)
       Open.sensible_write(file, serialized, :force => true)
       return nil

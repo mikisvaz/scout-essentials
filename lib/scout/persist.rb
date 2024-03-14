@@ -33,6 +33,7 @@ module Persist
     return yield if FalseClass === persist_options[:persist]
 
     file = persist_options[:path] || options[:path] || persistence_path(name, options)
+    data = persist_options[:data] || options[:data]
     no_load = persist_options[:no_load] || options[:no_load]
 
     if type == :memory
@@ -45,7 +46,7 @@ module Persist
     update = Open.mtime(update) if Path === update
     update = Open.mtime(file) >= update ? false : true if Time === update
 
-    lockfile = persist_options[:lockfile] || options[:lockfile] || Persist.persistence_path(file + '.persist', {:dir => Persist.lock_dir})
+    lockfile = persist_options[:lockfile] || options[:lockfile] || Persist.persistence_path(file + '.persist', {:dir => Persist.lock_dir}) if String === file
 
     Open.lock lockfile do |lock|
       if Open.exist?(file) && ! update
@@ -57,8 +58,16 @@ module Persist
       else
         begin
           file = file.find if Path === file
-          return yield(file) if block.arity == 1
-          res = yield
+          if block.arity == 1
+            if data
+              yield(data)
+              res = data
+            else
+              return yield(file)
+            end
+          else
+            res = yield
+          end
 
           if res.nil?
             if type.nil?

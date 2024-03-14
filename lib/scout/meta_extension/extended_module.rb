@@ -38,7 +38,7 @@ module MetaExtension
       obj.extend self unless self === obj
       attrs = self.instance_variable_get("@extension_attrs")
 
-      return if attrs.nil? || attrs.empty?
+      return obj if attrs.nil? || attrs.empty?
 
       if rest.length == 1 && Hash === (rlast = rest.last) && 
           ((! (rlkey = rlast.keys.first).nil? && attrs.include?(rlkey.to_sym)) ||

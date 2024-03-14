@@ -3,6 +3,10 @@ require File.expand_path(__FILE__).sub(%r(.*/test/), '').sub(/test_(.*)\.rb/,'\1
 
 class TestMetaExtension < Test::Unit::TestCase
 
+  module EmptyExtensionClass
+    extend MetaExtension
+  end
+
   module ExtensionClass
     extend MetaExtension
 
@@ -141,6 +145,10 @@ class TestMetaExtension < Test::Unit::TestCase
     MetaExtension.setup(str, [ExtensionClass], code: 'Some code')
 
     assert_equal 'Some code', str.code
+  end
+
+  def test_empty
+    refute EmptyExtensionClass.setup("foo").nil?
   end
 end
 

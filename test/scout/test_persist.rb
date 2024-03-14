@@ -158,9 +158,25 @@ class TestPersist < Test::Unit::TestCase
   end
 
   def test_path_prefix
-    Persist.persist('foo', :tsv, :prefix => "TSV") do |filename|
+    Persist.persist('foo', :marshal, :prefix => "TSV") do |filename|
       assert File.basename(filename).start_with? "TSV"
     end
+  end
+
+  def test_persist_with_data
+    res = Persist.persist('foo', :marshal, :prefix => "TSV", :data => {3 => 4}) do |data|
+      data[1] = 2
+    end
+    assert_equal 2, res[1]
+    assert_equal 4, res[3]
+    res2 = nil
+    assert_nothing_raised do
+      res2 = Persist.persist('foo', :marshal, :prefix => "TSV", :data => {}) do |data|
+        raise
+      end
+    end
+    assert_equal 2, res2[1]
+    assert_equal 4, res2[3]
   end
 
   def __test_speed
