@@ -28,7 +28,7 @@ module IndiferentHash
   end
 
   def self.pull_keys(hash, prefix)
-    new = {}
+    new = hash.include?("#{prefix}_options") ? hash.delete("#{prefix}_options") : {}
     prefix = prefix.to_s
     hash.keys.each do |key|
       if key.to_s =~ /#{ prefix }_(.*)/
