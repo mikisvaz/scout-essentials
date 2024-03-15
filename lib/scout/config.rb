@@ -19,7 +19,7 @@ module Scout::Config
     Log.debug "Loading config file: #{ file }"
     Open.read(file).split("\n").each do |line|
       next if line =~ /^#/
-      key, value, *tokens = line.strip.split(/\s/)
+      key, value, *tokens = line.strip.split(/\s+/)
 
       self.add_entry(key, value, tokens) if key
     end
