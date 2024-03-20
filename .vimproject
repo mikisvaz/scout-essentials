@@ -5,11 +5,11 @@ scout-essentials=/$PWD filter="*.rb *.txt *.md *.conf *.yaml" {
   scout-essentials.rb
   scout=scout{
    exceptions.rb
-   meta_extension.rb
-   meta_extension=meta_extension{
-    extended_object.rb
-    extended_module.rb
+   annotation.rb
+   annotation=annotation{
     array.rb
+    annotated_object.rb
+    annotation_module.rb
    }
    misc.rb
    misc=misc{
@@ -80,19 +80,16 @@ scout-essentials=/$PWD filter="*.rb *.txt *.md *.conf *.yaml" {
  test=test{
   test_helper.rb
   scout=scout{
-   misc=misc{
-    test_digest.rb
-    test_filesystem.rb
-    test_insist.rb
-    test_system.rb
-    test_helper.rb
+   test_annotation.rb
+   annotation=annotation{
+    test_annotated_object.rb
+    test_array.rb
     }
    test_cmd.rb
    test_concurrent_stream.rb
    test_config.rb
    test_indiferent_hash.rb
    test_log.rb
-   test_meta_extension.rb
    test_misc.rb
    test_named_array.rb
    test_open.rb
@@ -100,6 +97,13 @@ scout-essentials=/$PWD filter="*.rb *.txt *.md *.conf *.yaml" {
    test_persist.rb
    test_resource.rb
    test_tmpfile.rb
+   misc=misc{
+    test_digest.rb
+    test_filesystem.rb
+    test_helper.rb
+    test_insist.rb
+    test_system.rb
+    }
    }
  }
 }

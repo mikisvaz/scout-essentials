@@ -7,8 +7,8 @@ require_relative 'resource/util'
 require_relative 'resource/software'
 
 module Resource
-  extend MetaExtension
-  extension_attr :pkgdir, :libdir, :subdir, :resources, :rake_dirs, :path_maps, :lock_dir
+  extend Annotation
+  annotation :pkgdir, :libdir, :subdir, :resources, :rake_dirs, :path_maps, :lock_dir
 
   def self.default_lock_dir
     Path.setup('tmp/produce_locks').find

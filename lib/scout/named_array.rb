@@ -1,7 +1,7 @@
-require_relative 'meta_extension'
+require_relative 'annotation'
 module NamedArray
-  extend MetaExtension
-  extension_attr :fields, :key
+  extend Annotation
+  annotation :fields, :key
 
   def all_fields
     [key, fields].compact.flatten

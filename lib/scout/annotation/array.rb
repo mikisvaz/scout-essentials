@@ -1,17 +1,17 @@
-module ExtendedArray
+module AnnotatedArray
 
-  module ExtendedArrayItem
+  module AnnotatedArrayItem
     attr_accessor :container, :container_index
   end
   
   def self.is_contained?(obj)
-    ExtendedArrayItem === obj
+    AnnotatedArrayItem === obj
   end
 
   def annotate_item(obj, position = nil)
     obj = obj.dup if obj.frozen?
-    obj.extend ExtendedArray if Array === obj
-    obj.extend ExtendedArrayItem
+    obj.extend AnnotatedArray if Array === obj
+    obj.extend AnnotatedArrayItem
     obj.container = self
     obj.container_index = position
     self.annotate(obj)
@@ -66,7 +66,7 @@ module ExtendedArray
       res = super(*args)
 
       annotate(res)
-      res.extend ExtendedArray
+      res.extend AnnotatedArray
 
       res
     end

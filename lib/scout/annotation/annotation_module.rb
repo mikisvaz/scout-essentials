@@ -1,31 +1,31 @@
-module MetaExtension
-  module ExtendedModule
-    def extension_attr(*attrs)
-      self.instance_variable_get("@extension_attrs").concat attrs
+module Annotation
+  module AnnotationModule
+    def annotation(*attrs)
+      self.instance_variable_get("@annotations").concat attrs
       attrs.each do |a|
         self.attr_accessor a
       end
     end
 
     class << self
-      def extension_attrs
-        @extension_attrs ||= []
+      def annotations
+        @annotations ||= []
       end
     end
 
     def included(mod)
-      mod.instance_variable_set(:@extension_attrs, []) unless mod.instance_variables.include?(:@extension_attrs)
-      mod.instance_variable_get(:@extension_attrs).concat self.instance_variable_get(:@extension_attrs)
+      mod.instance_variable_set(:@annotations, []) unless mod.instance_variables.include?(:@annotations)
+      mod.instance_variable_get(:@annotations).concat self.instance_variable_get(:@annotations)
     end
 
     def extended(obj)
-      attrs = self.instance_variable_get("@extension_attrs")
+      attrs = self.instance_variable_get("@annotations")
 
-      obj.instance_variable_set(:@extension_attrs, []) unless obj.instance_variables.include?(:@extension_attrs)
-      obj.extension_types << self
+      obj.instance_variable_set(:@annotations, []) unless obj.instance_variables.include?(:@annotations)
+      obj.annotation_types << self
 
-      extension_attrs = obj.instance_variable_get(:@extension_attrs)
-      extension_attrs.concat attrs
+      annotations = obj.instance_variable_get(:@annotations)
+      annotations.concat attrs
     end
 
     def setup(*args,&block)
@@ -36,7 +36,7 @@ module MetaExtension
       end
       obj = block if obj.nil?
       obj.extend self unless self === obj
-      attrs = self.instance_variable_get("@extension_attrs")
+      attrs = self.instance_variable_get("@annotations")
 
       return obj if attrs.nil? || attrs.empty?
 

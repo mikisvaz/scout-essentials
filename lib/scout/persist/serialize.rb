@@ -34,8 +34,8 @@ module Persist
       content.to_json
     when :marshal
       Marshal.dump(content)
-    when :meta_extension
-      MetaExtension.tsv(content, :all).to_s
+    when :annotation, :annotations
+      Annotation.tsv(content, :all).to_s
     else
       if m = type.to_s.match(/(.*)_array/)
         type = m[1].to_sym
@@ -71,8 +71,8 @@ module Persist
       JSON.parse(serialized)
     when :marshal
       Marshal.load(serialized)
-    when :meta_extension
-      MetaExtension.load_tsv(TSV.open(serialized))
+    when :annotation, :annotations
+      Annotation.load_tsv(TSV.open(serialized))
     else
       if m = type.to_s.match(/(.*)_array/)
         type = m[1].to_sym

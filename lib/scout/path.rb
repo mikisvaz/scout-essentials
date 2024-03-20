@@ -1,11 +1,11 @@
-require_relative 'meta_extension'
+require_relative 'annotation'
 require_relative 'path/find'
 require_relative 'path/util'
 require_relative 'path/tmpfile'
 
 module Path
-  extend MetaExtension
-  extension_attr :pkgdir, :libdir, :path_maps
+  extend Annotation
+  annotation :pkgdir, :libdir, :path_maps
 
   def self.default_pkgdir
     @@default_pkgdir ||= 'scout'

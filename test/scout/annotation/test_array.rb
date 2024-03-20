@@ -1,25 +1,25 @@
 require File.expand_path(__FILE__).sub(%r(/test/.*), '/test/test_helper.rb')
 require File.expand_path(__FILE__).sub(%r(.*/test/), '').sub(/test_(.*)\.rb/,'\1')
 
-class TestExtensionArray < Test::Unit::TestCase
-  module ExtensionClass
-    extend MetaExtension
+class TestAnnotationArray < Test::Unit::TestCase
+  module AnnotationClass
+    extend Annotation
 
-    extension_attr :code, :code2
+    annotation :code, :code2
   end
 
-  module ExtensionClass2
-    extend MetaExtension
+  module AnnotationClass2
+    extend Annotation
 
-    extension_attr :code3, :code4
+    annotation :code3, :code4
   end
 
   def test_array
     ary = ["string"]
     code = "Annotation String"
-    ExtensionClass.setup(ary, code)
-    ary.extend ExtendedArray
-    assert_equal [ExtensionClass], ary.extension_types
+    AnnotationClass.setup(ary, code)
+    ary.extend AnnotatedArray
+    assert_equal [AnnotationClass], ary.annotation_types
     assert_equal code, ary.code
     assert_equal code, ary[0].code
 
@@ -31,9 +31,9 @@ class TestExtensionArray < Test::Unit::TestCase
     %w(first last).each do |method|
       ary = ["string"]
       code = "Annotation String"
-      ExtensionClass.setup(ary, code)
-      ary.extend ExtendedArray
-      assert_equal [ExtensionClass], ary.extension_types
+      AnnotationClass.setup(ary, code)
+      ary.extend AnnotatedArray
+      assert_equal [AnnotationClass], ary.annotation_types
 
       assert_equal code, ary.send(method).code
     end
@@ -42,8 +42,8 @@ class TestExtensionArray < Test::Unit::TestCase
   def test_array_each
     ary = ["string"]
     code = "Annotation String"
-    ExtensionClass.setup(ary, code)
-    ary.extend ExtendedArray
+    AnnotationClass.setup(ary, code)
+    ary.extend AnnotatedArray
 
     codes = []
     ary.each{|v| codes << v.code }
@@ -53,8 +53,8 @@ class TestExtensionArray < Test::Unit::TestCase
   def test_array_inject
     ary = ["string"]
     code = "Annotation String"
-    ExtensionClass.setup(ary, code)
-    ary.extend ExtendedArray
+    AnnotationClass.setup(ary, code)
+    ary.extend AnnotatedArray
 
     codes = []
     codes = ary.inject(codes){|acc,v| acc.push(v.code) }
@@ -64,8 +64,8 @@ class TestExtensionArray < Test::Unit::TestCase
   def test_array_collect
     ary = ["string"]
     code = "Annotation String"
-    ExtensionClass.setup(ary, code)
-    ary.extend ExtendedArray
+    AnnotationClass.setup(ary, code)
+    ary.extend AnnotatedArray
 
     codes = ary.collect{|v| v.code }
     assert_equal [code], codes
@@ -74,8 +74,8 @@ class TestExtensionArray < Test::Unit::TestCase
   def test_array_collect_no_block
     ary = ["string"]
     code = "Annotation String"
-    ExtensionClass.setup(ary, code)
-    ary.extend ExtendedArray
+    AnnotationClass.setup(ary, code)
+    ary.extend AnnotatedArray
 
     codes = ary.collect
     assert_equal ["string"], codes
@@ -84,8 +84,8 @@ class TestExtensionArray < Test::Unit::TestCase
   def test_compact
     ary = [nil,"string"]
     code = "Annotation String"
-    ExtensionClass.setup(ary, code)
-    ary.extend ExtendedArray
+    AnnotationClass.setup(ary, code)
+    ary.extend AnnotatedArray
 
     assert_equal code, ary.compact.first.code
   end
@@ -93,8 +93,8 @@ class TestExtensionArray < Test::Unit::TestCase
   def test_reverse
     ary = ["string2", "string1"]
     code = "Annotation String"
-    ExtensionClass.setup(ary, code)
-    ary.extend ExtendedArray
+    AnnotationClass.setup(ary, code)
+    ary.extend AnnotatedArray
 
     assert_equal code, ary.reverse.first.code
     assert_equal "string1", ary.reverse.first
@@ -103,16 +103,16 @@ class TestExtensionArray < Test::Unit::TestCase
   def test_purge
     ary = ["string2", "string1"]
     code = "Annotation String"
-    ExtensionClass.setup(ary, code)
-    ary.extend ExtendedArray
+    AnnotationClass.setup(ary, code)
+    ary.extend AnnotatedArray
 
-    assert MetaExtension.is_extended?(ary)
-    assert MetaExtension.is_extended?(ary.first)
+    assert Annotation.is_annotated?(ary)
+    assert Annotation.is_annotated?(ary.first)
 
-    ary = MetaExtension.purge(ary)
+    ary = Annotation.purge(ary)
 
-    refute MetaExtension.is_extended?(ary)
-    refute MetaExtension.is_extended?(ary.first)
+    refute Annotation.is_annotated?(ary)
+    refute Annotation.is_annotated?(ary.first)
 
   end
 end
