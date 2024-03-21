@@ -50,7 +50,7 @@ module Annotation
       end
 
       pairs.each do |name,value|
-        obj.instance_variable_set("@#{name}", value)
+        obj.instance_variable_set("@#{name}", value) unless value.nil?
       end
 
       obj
