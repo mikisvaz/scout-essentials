@@ -26,7 +26,7 @@ module Scout::Config
   end
 
   def self.load_config
-    Scout.etc.config.find_all.reverse.each do |file|
+    Path.setup("etc").config.find_all.reverse.each do |file|
       self.load_file(file)
     end
   end
