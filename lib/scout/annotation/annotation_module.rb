@@ -50,6 +50,7 @@ module Annotation
       end
 
       pairs.each do |name,value|
+        next if name.to_sym === :annotation_types
         obj.instance_variable_set("@#{name}", value) unless value.nil?
       end
 
