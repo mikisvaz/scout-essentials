@@ -23,7 +23,7 @@ module Persist
     other_options = IndiferentHash.pull_keys options, :other
     name = name.filename if name.respond_to?(:filename) && name.filename
     persist_options = {}
-    TmpFile.tmp_for_file(name, options.merge(persist_options), other_options.merge(filename: name))
+    TmpFile.tmp_for_file(name, options.merge(persist_options), other_options)
   end
 
   MEMORY_CACHE = {}
