@@ -11,8 +11,10 @@ module Misc
           '\'' << obj << '\''
         elsif File.directory?(obj)
           "Directory MD5: #{digest_str(Dir.glob(File.join(obj, "*")))}"
-        else
+        elsif Path.is_filename?(obj)
           "File MD5: #{Misc.file_md5(obj)}"
+        else
+          obj
         end
       when Integer, Symbol
         obj.to_s
