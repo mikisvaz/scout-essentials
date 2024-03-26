@@ -5,16 +5,18 @@ module Misc
       obj.digest_str
     else
       case obj
-      when String
-        #'\'' << obj << '\''
-        if Path === obj || ! Open.exists?(obj)
-          '\'' << obj << '\''
-        elsif File.directory?(obj)
+      when Path
+        case
+        when File.directory?(obj)
           "Directory MD5: #{digest_str(Dir.glob(File.join(obj, "*")))}"
-        elsif Path.is_filename?(obj)
+        else
+          '\'' << obj << '\''
+        end
+      when String
+        if Path.is_filename?(obj) && Open.exists?(obj)
           "File MD5: #{Misc.file_md5(obj)}"
         else
-          obj
+          obj.dup
         end
       when Integer, Symbol
         obj.to_s
