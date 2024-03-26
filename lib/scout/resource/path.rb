@@ -1,7 +1,7 @@
 module Path
   def produce(force = false)
     raise @produced if Exception === @produced
-    return self if ! force && (Open.exist?(self) || @produced)
+    return self if ! force && (Open.exist?(self.find) || @produced)
     begin
       if Resource === self.pkgdir
         self.pkgdir.produce self, force
