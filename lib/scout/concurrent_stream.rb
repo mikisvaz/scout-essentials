@@ -223,7 +223,7 @@ module ConcurrentStream
         self.join if ! @stream_exception && (self.closed? || self.eof?)
       end
     else
-      super(*args)
+      super(*args) unless self.closed?
     end
   end
 
