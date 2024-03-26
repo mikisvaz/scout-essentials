@@ -24,6 +24,8 @@ module Annotation
       Misc.digest([self, annotation_info])
     end
 
+    alias id annotation_id
+
     def annotate(other)
       annotation_types.each do |type|
         type.setup(other, annotation_hash)
