@@ -21,7 +21,7 @@ module Annotation
   end
 
   def self.is_annotated?(obj)
-    obj.respond_to?(:annotation_hash)
+    obj.instance_variables.include?(:@annotation_types)
   end
 
   def self.purge(obj)

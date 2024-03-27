@@ -150,5 +150,20 @@ class TestAnnotation < Test::Unit::TestCase
   def test_empty
     refute EmptyAnnotationClass.setup("foo").nil?
   end
+
+  def test_dump
+    a = AnnotationClass.setup("a", code: 'test1', code2: 'test2')
+    d = Marshal.dump(a)
+    a2 = Marshal.load(d)
+    assert_equal 'test1', a2.code
+  end
+
+  def test_dump_array
+    a = AnnotationClass.setup(["a"], code: 'test1', code2: 'test2')
+    a.extend AnnotatedArray
+    d = Marshal.dump(a)
+    a2 = Marshal.load(d)
+    assert_equal 'test1', a2.first.code
+  end
 end
 

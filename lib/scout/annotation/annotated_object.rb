@@ -12,12 +12,20 @@ module Annotation
       attr_hash = {}
       @annotations.each do |name|
         attr_hash[name] = self.instance_variable_get("@#{name}")
-      end
+      end if @annotations
       attr_hash
     end
 
     def annotation_info
-      annotation_hash.merge(annotation_types: annotation_types)
+      annotation_hash.merge(annotation_types: annotation_types, annotated_array: (AnnotatedArray === self))
+    end
+
+    def self.serialize(obj)
+      Annotation.purge(obj.annotation_info.merge(literal: obj))
+    end
+
+    def serialize
+      AnnotatedObject.serialize(self)
     end
 
     def annotation_id
@@ -41,11 +49,11 @@ module Annotation
           var_name = "@#{a}".to_sym
           new.remove_instance_variable(var_name) if new.instance_variables.include? var_name
         end
-        new.remove_instance_variable("@annotations")
+        new.remove_instance_variable(:@annotations)
       end
 
       if new.instance_variables.include?(:@annotation_types)
-        new.remove_instance_variable("@annotation_types")
+        new.remove_instance_variable(:@annotation_types)
       end
 
       new
