@@ -22,4 +22,27 @@ module Misc
       return nil
     end
   end
+
+  def self.tarize(path, dest = nil)
+    Misc.in_dir(path) do
+      if dest
+        CMD.cmd("tar cvfz '#{dest}' '.'")
+      else
+        CMD.cmd("tar cvfz - '.'", :pipe => true)
+      end
+    end
+  end
+
+  def self.untar(file, target = '.')
+    target = target.find if Path === target
+    file = file.find if Path === file
+    Misc.in_dir target do
+      if IO === file
+        CMD.cmd("tar xvfz -", in: file)
+      else
+        CMD.cmd("tar xvfz '#{file}'")
+      end
+    end
+  end
+
 end
