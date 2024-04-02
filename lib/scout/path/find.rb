@@ -33,6 +33,7 @@ module Path
   end
 
   def self.follow(path, map, map_name = nil)
+    map = File.join(map, '{PATH}') unless map.include?("{")
     file = map.sub('{PKGDIR}', path.pkgdir.respond_to?(:pkgdir) ? path.pkgdir.pkgdir || Path.default_pkgdir : path.pkgdir || Path.default_pkgdir).
       sub('{HOME}', ENV["HOME"]).
       sub('{RESOURCE}', path.pkgdir.to_s).

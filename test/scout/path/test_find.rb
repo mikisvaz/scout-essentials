@@ -106,5 +106,14 @@ class TestPathFind < Test::Unit::TestCase
     end
   end
 
+  def test_plain_map
+    path = Path.setup("somefile")
+    TmpFile.with_path do |tmpdir|
+      Open.write(tmpdir.somefile, 'test')
+      path.path_maps["tmpdir"] = tmpdir
+      assert path.exists?
+    end
+  end
+
 end
 
