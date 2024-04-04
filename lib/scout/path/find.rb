@@ -136,10 +136,6 @@ module Path
     @original
   end
 
-  def map_order
-    @map_order ||= (path_maps.keys & Path.basic_map_order) + (path_maps.keys - Path.basic_map_order)
-  end
-
   def follow(map_name = :default, annotate = true)
     IndiferentHash.setup(path_maps)
     map = path_maps[map_name] || Path.path_maps[map_name]

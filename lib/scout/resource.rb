@@ -8,10 +8,14 @@ require_relative 'resource/software'
 
 module Resource
   extend Annotation
-  annotation :pkgdir, :libdir, :subdir, :resources, :rake_dirs, :path_maps, :lock_dir
+  annotation :pkgdir, :libdir, :subdir, :resources, :rake_dirs, :path_maps, :map_order, :lock_dir
 
   def self.default_lock_dir
     Path.setup('tmp/produce_locks').find
+  end
+
+  def path_maps
+    @path_maps ||= Path.path_maps.dup
   end
 
   def subdir
@@ -27,7 +31,7 @@ module Resource
   end
 
   def root
-    Path.setup(subdir, self, self.libdir, @path_maps)
+    Path.setup(subdir, self, self.libdir, @path_maps, @map_order)
   end
 
   def method_missing(name, prev = nil, *args)

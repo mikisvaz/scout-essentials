@@ -5,7 +5,7 @@ require_relative 'path/tmpfile'
 
 module Path
   extend Annotation
-  annotation :pkgdir, :libdir, :path_maps
+  annotation :pkgdir, :libdir, :path_maps, :map_order
 
   def self.default_pkgdir
     @@default_pkgdir ||= 'scout'
@@ -25,6 +25,10 @@ module Path
 
   def path_maps
     @path_maps ||= Path.path_maps.dup
+  end
+
+  def map_order
+    @map_order ||= (path_maps.keys & Path.basic_map_order) + (path_maps.keys - Path.basic_map_order)
   end
 
   def join(subpath = nil, prevpath = nil)
