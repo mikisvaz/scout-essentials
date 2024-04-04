@@ -57,6 +57,8 @@ module Persist
         end
       else
         begin
+          Open.rm(file.find) if update && Open.exists?(file)
+
           file = file.find if Path === file
           if block.arity == 1
             if data
@@ -78,8 +80,6 @@ module Persist
               return Persist.load(file, type)
             end
           end
-
-          Open.rm(file)
 
           if IO === res || StringIO === res
             tee_copies = options[:tee_copies] || 1
