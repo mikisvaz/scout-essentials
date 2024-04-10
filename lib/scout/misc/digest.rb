@@ -14,7 +14,11 @@ module Misc
         end
       when String
         if Path.is_filename?(obj) && Open.exists?(obj)
-          "File MD5: #{Misc.file_md5(obj)}"
+          if File.directory?(obj)
+            "Directory MD5: #{digest_str(Dir.glob(File.join(obj, "*")))}"
+          else
+            "File MD5: #{Misc.file_md5(obj)}"
+          end
         else
           obj.dup
         end
