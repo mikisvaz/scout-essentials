@@ -5,6 +5,7 @@ require_relative 'annotation/annotation_module'
 module Annotation
 
   def self.setup(obj, annotation_types, annotation_hash)
+    return nil if obj.nil?
     annotation_types = annotation_types.split("|") if String === annotation_types
     annotation_types = [annotation_types] unless Array === annotation_types
     annotation_types.each do |type|
