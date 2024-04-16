@@ -109,20 +109,19 @@ module Log
 
   def self.logfile(file=nil)
     if file.nil?
-      @logfile ||= nil
+      @@logfile = nil
     else
       case file
       when String
-        @logfile = File.open(file, :mode => 'a')
-        @logfile.sync = true
+        @@logfile = File.open(file, :mode => 'a')
+        @@logfile.sync = true
       when IO, File
-        @logfile = file
+        @@logfile = file
       else
         raise "Unkown logfile format: #{file.inspect}"
       end
     end
   end
-
   def self.up_lines(num = 1)
     nocolor ? "" : "\033[#{num+1}F\033[2K"
   end
@@ -142,26 +141,26 @@ module Log
   MUTEX = Mutex.new
   def self.log_write(str)
     MUTEX.synchronize do
-      if logfile.nil?
+      if defined?(@@logfile) && @@logfile
+        @@logfile.write str
+      else
         begin
           STDERR.write str
         rescue
         end
-      else
-        logfile.write str
       end
     end
   end
 
   def self.log_puts(str)
     MUTEX.synchronize do
-      if logfile.nil?
+      if defined?(@@logfile) && @@logfile
+        @@logfile.puts str
+      else
         begin
           STDERR.puts str
         rescue
         end
-      else
-        logfile.puts str
       end
     end
   end
