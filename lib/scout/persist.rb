@@ -50,7 +50,7 @@ module Persist
 
     Open.lock lockfile do |lock|
       if Open.exist?(file) && ! update
-        if no_load
+        if TrueClass === no_load
           file
         else
           Persist.load(file, type)
@@ -72,12 +72,17 @@ module Persist
           end
 
           if res.nil?
-            if type.nil?
-              Log.debug "Empty result and no persist type; not loading result file"
-              return nil
+            if no_load
+              Log.debug "Empty result and no_load is '#{no_load}'"
+              return file
             else
-              Log.debug "Empty result; loading #{type} result from file"
-              return Persist.load(file, type)
+              if type.nil?
+                Log.debug "Empty result and no persist type; not loading result file"
+                return nil
+              else
+                Log.debug "Empty result; loading #{type} result from file"
+                return Persist.load(file, type)
+              end
             end
           end
 
@@ -113,7 +118,7 @@ module Persist
           raise $! unless options[:canfail]
         end
         
-        if no_load
+        if TrueClass === no_load
           file
         else
           res
