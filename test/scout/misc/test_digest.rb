@@ -26,5 +26,59 @@ class TestMiscDigest < Test::Unit::TestCase
       end
     end
   end
+
+  def test_file_digest
+    content1 =<<-EOF
+This is one file
+    EOF
+
+    content2 =<<-EOF
+This is another file
+    EOF
+
+    TmpFile.with_file(content1) do |file1|
+      TmpFile.with_file(content2) do |file2|
+        digest1 = Misc.digest_file(file1)
+        digest2 = Misc.digest_file(file2)
+        refute_equal digest1, digest2
+      end
+    end
+  end
+
+  def test_file_digest_fast
+    content1 =<<-EOF
+This is one file
+    EOF
+
+    content2 =<<-EOF
+This is another file
+    EOF
+
+    TmpFile.with_file(content1) do |file1|
+      TmpFile.with_file(content2) do |file2|
+        digest1 = Misc.fast_file_md5(file1, 5)
+        digest2 = Misc.fast_file_md5(file2, 5)
+        refute_equal digest1, digest2
+      end
+    end
+  end
+
+  def test_file_digest_fast_2
+    content1 =<<-EOF
+This is file 2
+    EOF
+
+    content2 =<<-EOF
+This is file 1
+    EOF
+
+    TmpFile.with_file(content1) do |file1|
+      TmpFile.with_file(content2) do |file2|
+        digest1 = Misc.fast_file_md5(file1, 5)
+        digest2 = Misc.fast_file_md5(file2, 5)
+        refute_equal digest1, digest2
+      end
+    end
+  end
 end
 

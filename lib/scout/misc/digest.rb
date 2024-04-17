@@ -17,7 +17,7 @@ module Misc
           if File.directory?(obj)
             "Directory MD5: #{digest_str(Dir.glob(File.join(obj, "*")))}"
           else
-            "File MD5: #{Misc.file_md5(obj)}"
+            "File MD5: #{Misc.digest_file(obj)}"
           end
         else
           obj.dup
@@ -65,8 +65,29 @@ module Misc
   def self.file_md5(file)
     file = file.find if Path === file
     file = File.expand_path(file)
-    Persist.persist("MD5:#{file}", :string) do
-      Digest::MD5.file(file).hexdigest
+    Digest::MD5.file(file).hexdigest
+  end
+
+  def self.fast_file_md5(file, sample = 5_000_000)
+    size = File.size(file)
+    sample_txt = size.to_s << ":" 
+    File.open(file) do |f|
+      sample_txt << f.read(sample)
+      f.seek(size/2)
+      sample_txt << f.read(sample)
+      f.seek(size - sample - 1)
+      sample_txt << f.read(sample)
+    end
+    Digest::MD5.hexdigest(sample_txt)
+  end
+
+  def self.digest_file(file)
+    file = file.find if Path === file
+    file = File.expand_path(file)
+    if File.size(file) > 30_000_000
+      fast_file_md5(file)
+    else
+      file_md5(file)
     end
   end
 end
