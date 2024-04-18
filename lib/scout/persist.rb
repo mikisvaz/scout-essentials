@@ -128,7 +128,7 @@ module Persist
   end
 
   def self.memory(name, options = {}, &block)
-    options[:persist_path] ||= options[:path] ||= [name, options[:key]].compact * ":"
+    options[:persist_path] ||= options[:path] ||= [name, options[:key]].compact * ":" if options[:key]
     self.persist(name, :memory, options, &block)
   end
 
