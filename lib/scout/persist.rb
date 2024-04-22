@@ -36,15 +36,19 @@ module Persist
     data = persist_options[:data] || options[:data]
     no_load = persist_options[:no_load] || options[:no_load]
 
-    if type == :memory
-      repo = options[:memory] || options[:repo] || MEMORY_CACHE
-      repo[file] ||= yield
-      return repo[file]
-    end
-
     update = options[:update] || persist_options[:update]
     update = Open.mtime(update) if Path === update
     update = Open.mtime(file) >= update ? false : true if Time === update
+
+    if type == :memory
+      repo = options[:memory] || options[:repo] || MEMORY_CACHE
+      if update
+        repo[file] = yield
+      else
+        repo[file] ||= yield
+      end
+      return repo[file]
+    end
 
     lockfile = persist_options[:lockfile] || options[:lockfile] || Persist.persistence_path(file + '.persist', {:dir => Persist.lock_dir}) if String === file
 
