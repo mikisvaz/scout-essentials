@@ -54,8 +54,9 @@ class DontClose < Exception
   end
 end
 
+class DontPersist < Exception; end
 
-class KeepLocked < Exception
+class KeepLocked < DontPersist
   attr_accessor :payload
   def initialize(payload)
     @payload = payload
