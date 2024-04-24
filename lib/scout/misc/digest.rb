@@ -9,6 +9,8 @@ module Misc
         case
         when File.directory?(obj)
           "Directory MD5: #{digest_str(Dir.glob(File.join(obj, "*")))}"
+        when obj.located? && File.exist?(obj)
+          "File MD5: #{Misc.digest_file(obj)}"
         else
           '\'' << obj << '\''
         end
