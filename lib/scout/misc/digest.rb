@@ -70,7 +70,7 @@ module Misc
     Digest::MD5.file(file).hexdigest
   end
 
-  def self.fast_file_md5(file, sample = 5_000_000)
+  def self.fast_file_md5(file, sample = 3_000_000)
     size = File.size(file)
     sample_txt = size.to_s << ":" 
     File.open(file) do |f|
@@ -86,7 +86,7 @@ module Misc
   def self.digest_file(file)
     file = file.find if Path === file
     file = File.expand_path(file)
-    if File.size(file) > 30_000_000
+    if File.size(file) > 10_000_000
       fast_file_md5(file)
     else
       file_md5(file)
