@@ -114,7 +114,7 @@ module Persist
           Thread.handle_interrupt(Exception => :never) do
             if Open.exist?(file)
               Log.debug "Failed persistence #{file} - erasing"
-              Open.rm file
+              Open.rm_rf file
             else
               Log.debug "Failed persistence #{file}"
             end
