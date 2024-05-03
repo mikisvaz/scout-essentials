@@ -20,7 +20,8 @@ module Resource
       if String ===  pattern and pattern.include?('{')
         regexp = "^" + pattern
           .gsub(/{(TOPLEVEL)}/,'(?<\1>[^/]+)')
-          .gsub(/{([^}]+)}/,'(?<\1>[^/]+)?') +
+          .gsub(/\.{(PKGDIR)}/,'\.(?<\1>[^/]+)')
+          .gsub(/\/{([^}]+)}/,'(?:/(?<\1>[^/]+))?') +
         "(?:/(?<REST>.*))?/?$"
         if m = path.match(regexp) 
           if ! m.named_captures.include?("PKGDIR") || m["PKGDIR"] == self.pkgdir
@@ -46,7 +47,7 @@ module Resource
 
   def self.identify(path)
     resource = path.pkgdir if Path === path
-    resource = Scout unless Resource === resource
+    resource = Resource.default_resource unless Resource === resource
     unlocated = resource.identify path
   end
 

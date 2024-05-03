@@ -10,6 +10,14 @@ module Resource
   extend Annotation
   annotation :pkgdir, :libdir, :subdir, :resources, :rake_dirs, :path_maps, :map_order, :lock_dir
 
+  class << Resource
+    attr_accessor :default_resource
+
+    def default_resource
+      @default_resource ||= Scout
+    end
+  end
+
   def self.default_lock_dir
     Path.setup('tmp/produce_locks').find
   end
