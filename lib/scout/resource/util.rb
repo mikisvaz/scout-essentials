@@ -22,18 +22,22 @@ module Resource
           .gsub(/{(TOPLEVEL)}/,'(?<\1>[^/]+)')
           .gsub(/\.{(PKGDIR)}/,'\.(?<\1>[^/]+)')
           .gsub(/\/{([^}]+)}/,'(?:/(?<\1>[^/]+))?') +
-        "(?:/(?<REST>.*))?/?$"
+        "(?:/(?<REST>.+))?/?$"
         if m = path.match(regexp) 
           if ! m.named_captures.include?("PKGDIR") || m["PKGDIR"] == self.pkgdir
+
             unlocated = %w(TOPLEVEL SUBPATH PATH REST).collect{|c| 
               m.named_captures.include?(c) ? m[c] : nil
             }.compact * "/"
+
             unlocated.gsub!(/\/+/,'/')
+
             if self.subdir && ! self.subdir.empty?
               subdir = self.subdir
               subdir += "/" unless subdir.end_with?("/")
               unlocated[subdir] = "" 
             end
+
             choices << self.annotate(unlocated)
           end
         end
