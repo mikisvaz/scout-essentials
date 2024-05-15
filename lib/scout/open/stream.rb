@@ -126,7 +126,11 @@ module Open
               end
             end
           else
-            File.open(tmp_path, 'wb') do |f|  end
+            if content.respond_to?(:write_file)
+              content.write_file(tmp_path)
+            else
+              File.open(tmp_path, 'wb') do |f| f.write content.to_s  end
+            end
           end
 
           begin
