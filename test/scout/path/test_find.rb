@@ -115,5 +115,28 @@ class TestPathFind < Test::Unit::TestCase
     end
   end
 
+  def test_add_path
+    TmpFile.with_path do |dir1|
+      TmpFile.with_path do |dir2|
+        TmpFile.with_path do |dir3|
+          TmpFile.with_path do |dir4|
+            Open.write(dir1.foo, "FOO1")
+            Open.write(dir2.foo, "FOO2")
+            Open.write(dir3.foo, "FOO3")
+            Open.write(dir4.foo, "FOO4")
+            file = Path.setup('foo')
+            file.append_path 'dir1', dir1
+            assert_equal "FOO1", Open.read(file)
+            file.prepend_path 'dir2', dir2
+            assert_equal "FOO2", Open.read(file)
+            file.prepend_path 'dir3', dir3
+            assert_equal "FOO3", Open.read(file)
+            file.append_path 'dir4', dir4
+            assert_equal "FOO3", Open.read(file)
+          end
+        end
+      end
+    end
+  end
 end
 

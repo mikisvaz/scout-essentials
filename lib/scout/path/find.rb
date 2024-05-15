@@ -94,6 +94,16 @@ module Path
     @@map_order = nil
   end
 
+  def prepend_path(name, map)
+    @@path_maps[name] = map
+    map_order.unshift(name.to_sym)
+  end
+
+  def append_path(name, map)
+    @@path_maps[name] = map
+    map_order.push(name.to_sym)
+  end
+
   def self.load_path_maps(filename)
     Path.setup(filename) unless Path === filename
     if filename.exist?
