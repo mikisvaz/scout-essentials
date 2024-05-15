@@ -7,10 +7,8 @@ module Annotation
       end
     end
 
-    class << self
-      def annotations
-        @annotations ||= []
-      end
+    def annotations
+      @annotations ||= []
     end
 
     def included(mod)
