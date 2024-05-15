@@ -64,7 +64,7 @@ module Path
   end
 
   def glob_all(pattern = nil, caller_lib = nil, search_paths = nil)
-    search_paths ||= Path.path_maps
+    search_paths ||= self.path_maps || Path.path_maps
     search_paths = search_paths.dup
 
     search_paths.keys.collect do |where| 
