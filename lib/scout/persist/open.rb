@@ -8,7 +8,7 @@ module Open
   end
 
   def self.yaml(file)
-    Open.open(file){|f| YAML.load(f) }
+    Open.open(file){|f| YAML.unsafe_load(f) }
   end
 
   def self.marshal(file)
