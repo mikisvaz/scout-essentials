@@ -7,7 +7,7 @@ module Path
       caller_dup = caller.dup
       while file = caller_dup.shift
         break unless file =~ /(?:scout|rbbt)\/(?:resource\.rb|workflow\.rb)/ or
-          file =~ /(?:scout|rbbt)\/(?:.*\/)?(path|open)\.rb/ or
+          file =~ /(?:scout|rbbt)\/(?:.*\/)?(path|open|tsv|refactor)\.rb/ or
           file =~ /(?:scout|rbbt)\/(?:.*\/)?path\/(?:find|refactor|util)\.rb/ or
           file =~ /(?:scout|rbbt)\/persist.rb/ or
           file =~ /scout\/resource\/produce.rb/ or
@@ -90,17 +90,27 @@ module Path
   end
 
   def self.add_path(name, map)
-    @@path_maps[name] = map
+    path_maps[name] = map
     @@map_order = nil
   end
 
+  def self.prepend_path(name, map)
+    path_maps[name] = map
+    map_order.unshift(name.to_sym)
+  end
+
+  def self.append_path(name, map)
+    path_maps[name] = map
+    map_order.push(name.to_sym)
+  end
+
   def prepend_path(name, map)
-    @@path_maps[name] = map
+    path_maps[name] = map
     map_order.unshift(name.to_sym)
   end
 
   def append_path(name, map)
-    @@path_maps[name] = map
+    path_maps[name] = map
     map_order.push(name.to_sym)
   end
 

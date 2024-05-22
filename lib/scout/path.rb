@@ -28,7 +28,7 @@ module Path
   end
 
   def map_order
-    @map_order ||= (path_maps.keys & Path.basic_map_order) + (path_maps.keys - Path.basic_map_order)
+    @map_order ||= (path_maps.keys & Path.map_order) + (path_maps.keys - Path.map_order)
   end
 
   def join(subpath = nil, prevpath = nil)

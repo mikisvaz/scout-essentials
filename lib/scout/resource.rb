@@ -39,7 +39,7 @@ module Resource
   end
 
   def root
-    Path.setup(subdir, self, self.libdir, @path_maps, @map_order)
+    Path.setup(subdir.dup, self, self.libdir, @path_maps, @map_order)
   end
 
   def method_missing(name, prev = nil, *args)
