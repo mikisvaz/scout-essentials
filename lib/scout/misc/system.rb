@@ -13,6 +13,22 @@ module Misc
     Sys::ProcTable.ps.select{ |pe| pe.ppid == ppid }
   end
 
+  def self.wait_child(pid)
+    begin
+      Process.waitpid2 pid.to_i
+    rescue Errno::ECHILD
+    end
+  end
+
+  def self.abort_child(pid, wait = true)
+    begin
+      Process.kill("TERM", pid.to_i)
+      wait_child(pid) if wait
+    rescue
+      Log.debug("Process #{pid} was not killed: #{$!.message}")
+    end
+  end
+
   def self.env_add(var, value, sep = ":", prepend = true)
     if ENV[var].nil?
       ENV[var] = value
