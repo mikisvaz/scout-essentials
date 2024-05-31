@@ -62,8 +62,8 @@ module AnnotatedArray
 
   %w(compact uniq flatten reverse sort_by).each do |method|
 
-    self.define_method(method) do |*args|
-      res = super(*args)
+    self.define_method(method) do |*args,&block|
+      res = super(*args, &block)
 
       annotate(res)
       res.extend AnnotatedArray
