@@ -106,4 +106,17 @@ module Misc
     sd = Misc.sd(list)
     (e.to_f - m) / sd
   end
+
+  def self.softmax(array)
+		# Compute the exponentials of the input array elements
+		exp_array = array.map { |x| Math.exp(x) }
+
+		# Sum of all exponentials
+		sum_exp = exp_array.sum
+
+		# Compute the softmax values by dividing each exponential by the sum of exponentials
+		softmax_array = exp_array.map { |x| x / sum_exp }
+
+		return softmax_array
+	end
 end
