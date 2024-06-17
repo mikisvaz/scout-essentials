@@ -84,9 +84,18 @@ module NamedArray
 
 
   def concat(other)
-    super(other)
-    self.fields.concat(other.fields) if NamedArray === other
-    self
+    if Hash === other
+      new_fields = []
+      other.each do |k,v|
+        new_fields << k
+        self << v
+      end
+      self.fields.concat(new_fields)
+    else
+      super(other)
+      self.fields.concat(other.fields) if NamedArray === other
+      self
+    end
   end
 
   def to_hash
