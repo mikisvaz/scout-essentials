@@ -2,6 +2,7 @@ require_relative 'annotation'
 require_relative 'path/find'
 require_relative 'path/util'
 require_relative 'path/tmpfile'
+require_relative 'path/digest'
 
 module Path
   extend Annotation

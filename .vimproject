@@ -50,6 +50,7 @@ scout-essentials=/$PWD filter="*.rb *.txt *.md *.conf *.yaml" {
     find.rb
     tmpfile.rb
     util.rb
+    digest.rb
    }
    concurrent_stream.rb
    cmd.rb

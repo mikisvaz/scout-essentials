@@ -1,5 +1,6 @@
 module Misc
   MAX_ARRAY_DIGEST_LENGTH = 100_000
+
   def self.digest_str(obj)
     if obj.respond_to?(:digest_str)
       obj.digest_str
