@@ -1,5 +1,6 @@
 module Misc
   def self.pid_alive?(pid)
+    return true if Process.pid == pid
     !! Process.kill(0, pid) rescue false
   end
 
