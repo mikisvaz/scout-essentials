@@ -36,7 +36,7 @@ module Misc
     current = 0
     res = [] unless block_given?
     while current < total
-      last = current + num - 1
+      last = current + size - 1
       if block_given?
         yield array[current..last]
       else
