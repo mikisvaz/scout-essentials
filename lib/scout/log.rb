@@ -146,7 +146,7 @@ module Log
       else
         begin
           STDERR.write str
-        rescue
+        rescue IOError
         end
       end
     end
