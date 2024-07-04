@@ -6,6 +6,11 @@ class TestMiscHelper < Test::Unit::TestCase
     assert_equal 2, Misc.divide(%w(1 2 3 4 5 6 7 8 9),2).length
   end
 
+  def test_chunk
+    assert_equal %w(1 2), Misc.chunk(%w(1 2 3 4 5 6 7 8 9),2)[0]
+  end
+
+
   def test_ordered_divide
     assert_equal 5, Misc.ordered_divide(%w(1 2 3 4 5 6 7 8 9),2).length
   end

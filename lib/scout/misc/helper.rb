@@ -28,14 +28,23 @@ module Misc
     counts
   end
 
-  def self.chunk(array, num)
+  # Divides the array into chunks of size +size+ by taking
+  # consecutive elements. If a block is given it runs it
+  # instead of returning the chunks
+  def self.chunk(array, size)
     total = array.length
     current = 0
+    res = [] unless block_given?
     while current < total
       last = current + num - 1
-      yield array[current..last]
+      if block_given?
+        yield array[current..last]
+      else
+        res << array[current..last]
+      end
       current = last + 1
     end
+    block_given? ? nil : res
   end
 
   # Divides the array into +num+ chunks of the same size by placing one
