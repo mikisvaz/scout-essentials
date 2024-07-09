@@ -36,9 +36,7 @@ module Misc
     end
   end
 
-
-  
-  MAX_TTY_LINE_WIDTH = 100
+  MAX_TTY_LINE_WIDTH = 160
   def self.format_paragraph(text, size = nil, indent = nil, offset = nil)
     size ||= Log.tty_size || MAX_TTY_LINE_WIDTH
     size = MAX_TTY_LINE_WIDTH if size > MAX_TTY_LINE_WIDTH
