@@ -242,6 +242,11 @@ module Open
     nil
   end
 
+  def self.link_dir(source, target)
+    Log.debug "Copy with hard-links #{Log.fingerprint source}->#{Log.fingerprint target}"
+    FileUtils.cp_lr(source, target)
+  end
+
   def self.list(file)
     file = file.produce_and_find if Path === file
     Open.read(file).split("\n")

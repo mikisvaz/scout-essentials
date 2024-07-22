@@ -63,10 +63,25 @@ class TestOpenUtil < Test::Unit::TestCase
       file1 = directory.subdir1.file
       file2 = directory.subdir2.file
       Open.write(file1, "TEST")
-      Open.ln_s file1, file2
+      Open.ln_h file1, file2
       assert_equal "TEST", Open.read(file2)
       Open.write(file1, "TEST2")
       assert_equal "TEST2", Open.read(file2)
+      assert_equal File.stat(file1).ino, File.stat(file2).ino
+    end
+  end
+
+  def test_ln_recursive
+    TmpFile.with_file do |directory|
+      Path.setup(directory)
+      file1 = directory.subdir1.file
+      file2 = directory.subdir2.file
+      Open.write(file1, "TEST")
+      Open.link_dir directory.subdir1, directory.subdir2
+      assert_equal "TEST", Open.read(file2)
+      Open.write(file1, "TEST2")
+      assert_equal "TEST2", Open.read(file2)
+      assert_equal File.stat(file1).ino, File.stat(file2).ino
     end
   end
 end
