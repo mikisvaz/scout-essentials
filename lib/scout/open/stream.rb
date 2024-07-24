@@ -440,7 +440,7 @@ module Open
   #  StringIO.new stream.read.split("\n").sort.uniq * "\n"
   #end
 
-  def self.collapse_stream(s, line: nil, sep: "\t", header: nil, &block)
+  def self.collapse_stream(s, line: nil, sep: "\t", header: nil, compact: false, &block)
     sep ||= "\t"
     Open.open_pipe do |sin|
 
@@ -458,8 +458,13 @@ module Open
           current_key = key
         when current_key == key
           parts.each_with_index do |part,i|
-            if current_parts[i].nil?
-              current_parts[i] = "|" << part
+            next if compact and part.nil? || part.empty?
+            if current_parts[i].nil? || current_parts[i].empty?
+              if compact
+                current_parts[i] = part.dup
+              else
+                current_parts[i] = "|" << part
+              end
             else
               current_parts[i] = current_parts[i] << "|" << part
             end

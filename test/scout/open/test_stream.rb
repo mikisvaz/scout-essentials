@@ -393,6 +393,34 @@ row2 aa bb cc
     s = StringIO.new text
     assert Open.collapse_stream(s, sep: " ").read =~  /\|cc$/
   end
+
+  def test_collapse_stream_compact
+    text=<<-EOF
+row1	A	B	C
+row1	a	b	c
+row2		BB	CC
+row2	aa	bb	cc
+row2	aaa		ccc
+    EOF
+
+    s = StringIO.new text
+    stream = Open.collapse_stream(s, sep: "\t", compact: false)
+    txt = stream.read
+    assert_include txt, "A|a"
+    assert_include txt, "B|b"
+    assert_include txt, "C|c"
+    assert_include txt, "|aa"
+
+    s = StringIO.new text
+    stream = Open.collapse_stream(s, sep: "\t", compact: true)
+    txt = stream.read
+    assert_include txt, "A|a"
+    assert_include txt, "B|b"
+    assert_include txt, "C|c"
+    assert_not_include txt, "|aa\t"
+    assert_not_include txt, "bb|"
+  end
+
   #
   #
   #  def test_paste_stream
