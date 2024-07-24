@@ -11,7 +11,7 @@ module Open
                end
              end
 
-  def self.grep(stream, grep, invert = false, fixed = nil)
+  def self.grep(stream, grep, invert = false, fixed = nil, options = {})
     case 
     when Array === grep
       TmpFile.with_file(grep * "\n", false) do |f|

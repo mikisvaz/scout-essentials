@@ -31,13 +31,13 @@ module Open
     File.open(file, mode)
   end
 
-  def self.file_open(file, grep = false, mode = 'r', invert_grep = false, options = {})
+  def self.file_open(file, grep = false, mode = 'r', invert_grep = false, fixed_grep = true, options = {})
     Open.mkdir File.dirname(file) if mode.include? 'w'
 
     stream = get_stream(file, mode, options)
 
     if grep
-      grep(stream, grep, invert_grep)
+      grep(stream, grep, invert_grep, fixed_grep)
     else
       stream
     end
@@ -72,7 +72,7 @@ module Open
 
     options[:noz] = true if mode.include? "w"
 
-    io = file_open(file, options[:grep], mode, options[:invert_grep], options)
+    io = file_open(file, options[:grep], mode, options[:invert_grep], options[:fixed_grep], options)
 
     io = unzip(io)   if ((String === file and zip?(file))   and not options[:noz]) or options[:zip]
     io = gunzip(io)  if ((String === file and gzip?(file))  and not options[:noz]) or options[:gzip]
