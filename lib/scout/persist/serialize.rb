@@ -145,6 +145,8 @@ module Persist
       Open.marshal(file)
     when :stream
       Open.open(file)
+    when :path
+      Path === file ? file : Path.setup(file)
     when :file
       value = Open.read(file)
       value.sub!(/^\./, File.dirname(file)) if value.start_with?("./")
