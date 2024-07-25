@@ -51,13 +51,17 @@ module ConcurrentStream
       end
     end
 
-    stream.filename = filename.nil? ? stream.inspect.split(":").last[0..-2] : filename
+    stream.filename = filename if filename
 
     stream.lock = lock unless lock.nil?
 
     stream.aborted = false
 
     stream
+  end
+
+  def filename 
+    @filename || self.inspect.split(":").last[0..-2]
   end
 
   def annotate(stream)
