@@ -9,6 +9,7 @@ module AnnotatedArray
   end
 
   def annotate_item(obj, position = nil)
+    return obj if obj.nil?
     obj = obj.dup if obj.frozen?
     obj.extend AnnotatedArray if Array === obj
     obj.extend AnnotatedArrayItem
