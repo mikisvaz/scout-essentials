@@ -41,7 +41,10 @@ module CMD
         if claim
           claim.produce
         else
-          block.call
+          res = block.call
+          if Hash === res
+            Resource.install res, tool.to_s
+          end
         end
       end
       version_txt = ""
