@@ -38,6 +38,15 @@ module AnnotatedArray
     end
   end
 
+  def select(&block)
+    selected = []
+    each do |item|
+      selected << item if block.call(item)
+    end
+
+    self.annotate(selected)
+  end
+
   def each(&block)
     i = 0
     super do |item|
