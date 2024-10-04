@@ -100,8 +100,8 @@ module NamedArray
 
   def to_hash
     hash = {}
-    self.fields.zip(self) do |field,value|
-      hash[field] = value
+    self.fields.each do |field|
+      hash[field] = self[field]
     end
     IndiferentHash.setup hash
   end

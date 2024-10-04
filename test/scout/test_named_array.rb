@@ -39,5 +39,10 @@ ValueB (Entity type)
     assert_equal 1, a.a
     assert_equal 2, a.b
   end
-end
 
+  def test_to_hash
+    a = NamedArray.setup([1,2], [:a, :b])
+    assert_equal 1, a.to_hash[:a]
+    assert_equal 2, a.to_hash[:b]
+  end
+end
