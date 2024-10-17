@@ -92,5 +92,12 @@ module IndiferentHash
     end
     IndiferentHash.setup(super(*ext_list))
   end
+
+  def keys_to_sym!
+    string_keys = keys.select{|k| String === k}
+    string_keys.each do |key|
+      self[key.to_sym] = self.delete(key)
+    end
+  end
 end
 
