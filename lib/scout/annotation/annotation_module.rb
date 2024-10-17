@@ -34,7 +34,11 @@ module Annotation
       end
       obj = block if obj.nil?
       return nil if obj.nil?
-      obj.extend self unless self === obj
+      begin
+        obj.extend self unless self === obj
+      rescue TypeError
+        return obj
+      end
       attrs = self.instance_variable_get("@annotations")
 
       return obj if attrs.nil? || attrs.empty?
