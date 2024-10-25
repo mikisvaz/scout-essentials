@@ -34,7 +34,7 @@ module AnnotatedArray
 
   def each_with_index(&block)
     super do |item,i|
-      block.call annotate_item(item, i)
+      block.call annotate_item(item, i), i
     end
   end
 
