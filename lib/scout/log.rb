@@ -252,14 +252,18 @@ module Log
   end
 
   def self.exception(e)
-    stack = caller
+    return if e.message.include?("NOLOG")
+    last_caller = last_caller caller
+    message = e.message
+    message = Log.fingerprint(message) if String === message && message.length > 1000
     backtrace = e.backtrace || []
+    backtrace = [] if message.include?("NOSTACK")
     if ENV["SCOUT_ORIGINAL_STACK"] == 'true'
-      error([e.class.to_s, e.message].compact * ": " )
-      error("BACKTRACE [#{Process.pid}]: " << Log.last_caller(stack) << "\n" + color_stack(backtrace)*"\n")
+      error([e.class.to_s, message].compact * ": " )
+      error("BACKTRACE [#{Process.pid}]: " << last_caller << "\n" + color_stack(backtrace)*"\n")
     else
-      error("BACKTRACE [#{Process.pid}]: " << Log.last_caller(stack) << "\n" + color_stack(backtrace.reverse)*"\n")
-      error([e.class.to_s, e.message].compact * ": " )
+      error("BACKTRACE [#{Process.pid}]: " << last_caller << "\n" + color_stack(backtrace.reverse)*"\n")
+      error([e.class.to_s, message].compact * ": " )
     end
   end
 
@@ -355,6 +359,7 @@ def ppp(message)
   stack = caller
   puts "#{Log.color :cyan, "PRINT:"} " << stack.first
   puts ""
+  message = message.prety_print if message.respond_to?(:prety_print)
   if message.length > 200 or message.include? "\n"
     puts Log.color(:cyan, "=>|") << "\n" << message.to_s
   else

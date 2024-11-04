@@ -158,4 +158,8 @@ module NamedArray
       return super(name, *args)
     end
   end
+
+  def prety_print
+    Misc.format_definition_list(self.to_hash)
+  end
 end
