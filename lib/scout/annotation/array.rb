@@ -70,6 +70,10 @@ module AnnotatedArray
     end
   end
 
+  def subset(list)
+    self.annotate(self & list)
+  end
+
   %w(compact uniq flatten reverse sort_by).each do |method|
 
     self.define_method(method) do |*args,&block|
