@@ -34,6 +34,7 @@ module Resource
     rake_dir = rake_dir.find(:user) if rake_dir.respond_to? :find
 
     begin
+      Thread.current["resource"] = self
       if Proc === rakefile
         ScoutRake.run(nil, rake_dir, task, &rakefile)
       else
