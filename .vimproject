@@ -34,6 +34,11 @@ scout-essentials=/$PWD filter="*.rb *.txt *.md *.conf *.yaml" {
     color_class.rb
     fingerprint.rb
     progress.rb
+    progress=progress{
+     report.rb
+     util.rb
+    }
+
     trap.rb
    }
    tmpfile.rb
