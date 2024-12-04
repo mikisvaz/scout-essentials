@@ -68,11 +68,11 @@ module Open
 
     options = IndiferentHash.add_defaults options, :noz => false, :mode => 'r'
 
-    mode = IndiferentHash.process_options options, :mode
+    mode, grep, invert_grep, fixed_grep = IndiferentHash.process_options options, :mode, :grep, :invert_grep, :fixed_grep
 
     options[:noz] = true if mode.include? "w"
 
-    io = file_open(file, options[:grep], mode, options[:invert_grep], options[:fixed_grep], options)
+    io = file_open(file, grep, mode, invert_grep, fixed_grep, options)
 
     io = unzip(io)   if ((String === file and zip?(file))   and not options[:noz]) or options[:zip]
     io = gunzip(io)  if ((String === file and gzip?(file))  and not options[:noz]) or options[:gzip]
