@@ -31,6 +31,7 @@ module TmpFile
   # Creates a random filename in the temporary directory
   def self.tmp_file(prefix = 'tmp-', max = 1_000_000_000, dir = nil)
     dir ||= TmpFile.tmpdir
+    dir = dir.find if Path === dir
     File.expand_path(File.join(dir, random_name(prefix, max)))
   end
 
