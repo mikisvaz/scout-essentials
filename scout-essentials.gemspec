@@ -138,7 +138,7 @@ Gem::Specification.new do |s|
   ]
   s.homepage = "http://github.com/mikisvaz/scout-essentials".freeze
   s.licenses = ["MIT".freeze]
-  s.rubygems_version = "3.5.21".freeze
+  s.rubygems_version = "3.5.23".freeze
   s.summary = "Scout essential tools".freeze
 
   s.specification_version = 4
