@@ -72,7 +72,7 @@ module Misc
       end*""
   end
 
-  def self.format_definition_list_item(dt, dd,  indent = nil, size = nil, color = :yellow)
+  def self.format_definition_list_item(dt, dd,  indent = nil, size = nil, color: :yellow)
     if size.nil?
       base_size = MAX_TTY_LINE_WIDTH
       base_indent = indent || (base_size / 3)
@@ -98,12 +98,12 @@ module Misc
     text
   end
 
-  def self.format_definition_list(defs, indent = nil, size = nil, color = :yellow, sep = "\n\n")
+  def self.format_definition_list(defs, indent = nil, size = nil, color: :yellow, sep: "\n\n")
     indent ||= 30
     size ||= (Log.tty_size || MAX_TTY_LINE_WIDTH) - indent
     entries = []
     defs.each do |dt,dd|
-      text = format_definition_list_item(dt,dd,indent, size,color)
+      text = format_definition_list_item(dt,dd,indent, size, color: color)
       entries << text
     end
     entries * sep 

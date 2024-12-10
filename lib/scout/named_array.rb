@@ -160,6 +160,6 @@ module NamedArray
   end
 
   def prety_print
-    Misc.format_definition_list(self.to_hash)
+    Misc.format_definition_list(self.to_hash, sep: "\n")
   end
 end
