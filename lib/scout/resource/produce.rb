@@ -22,7 +22,7 @@ module Resource
     }.last
   end
 
-  def has_rake(path)
+  def has_rake?(path)
     !! rake_for(path)
   end
 
@@ -56,7 +56,7 @@ module Resource
       type, content = @resources[path]
     when (Path === path && @resources && @resources.include?(path.original))
       type, content = @resources[path.original]
-    when has_rake(path)
+    when has_rake?(path)
       type = :rake
       rake_dir, content = rake_for(path)
       rake_dir = Path.setup(rake_dir.dup, self.pkgdir, self)
