@@ -82,6 +82,17 @@ module Path
     end.flatten.uniq
   end
 
+  def get_extension(multiple = false)
+    parts = File.basename(self).split(".")
+    extension = [parts.pop]
+
+    while parts.length < 5
+      extension << [parts.pop]
+    end if multiple
+
+    extension * "."
+  end
+
   def set_extension(extension)
     self.annotate(self + ".#{extension}")
   end
