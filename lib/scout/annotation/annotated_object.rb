@@ -1,9 +1,5 @@
 module Annotation
   module AnnotatedObject
-    def annotations
-      @annotations ||= []
-    end
-
     def annotation_types
       @annotation_types ||= []
     end
