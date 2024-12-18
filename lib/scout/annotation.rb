@@ -9,8 +9,12 @@ module Annotation
     annotation_types = annotation_types.split("|") if String === annotation_types
     annotation_types = [annotation_types] unless Array === annotation_types
     annotation_types.each do |type|
-      type = Kernel.const_get(type) if String === type
-      type.setup(obj, annotation_hash)
+      begin
+        type = Kernel.const_get(type) if String === type
+        type.setup(obj, annotation_hash)
+      rescue NameError
+        Log.warn "Annotation #{type} not defined"
+      end
     end
     obj
   end
