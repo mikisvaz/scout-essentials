@@ -42,7 +42,7 @@ module NamedArray
         pos = names.index{|f| f.to_s == field }
         next pos if pos
         if field =~ /^\d+$/
-          next identify_names(names, field.to_i)
+          next identify_name(names, field.to_i)
         end
         next pos if strict
         pos = names.index{|name| field_match(field, name) }
