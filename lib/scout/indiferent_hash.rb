@@ -99,5 +99,9 @@ module IndiferentHash
       self[key.to_sym] = self.delete(key)
     end
   end
+
+  def prety_print
+    Misc.format_definition_list(self, sep: "\n")
+  end
 end
 
