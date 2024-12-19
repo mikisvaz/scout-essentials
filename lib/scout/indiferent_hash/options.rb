@@ -29,7 +29,9 @@ module IndiferentHash
 
   def self.pull_keys(hash, prefix)
     IndiferentHash.setup(hash)
-    new = hash.include?("#{prefix}_options") ? hash.delete("#{prefix}_options") : {}
+    new = hash.delete("#{prefix}_options") if hash.include?("#{prefix}_options")
+    new = {} if new.nil?
+    IndiferentHash.setup(new)
     prefix = prefix.to_s
     hash.keys.each do |key|
       if key.to_s =~ /#{ prefix }_(.*)/
@@ -45,8 +47,7 @@ module IndiferentHash
         end
       end
     end
-
-    IndiferentHash.setup(new)
+    new
   end
 
   def self.zip2hash(list1, list2)

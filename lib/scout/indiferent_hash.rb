@@ -17,6 +17,19 @@ module IndiferentHash
     new
   end
 
+  def deep_merge(other)
+    new = self.dup
+    IndiferentHash.setup(new)
+    other.each do |k,value|
+      if new.include?(k) && IndiferentHash === new[k] && Hash === value
+        new[k] = new[k].deep_merge(value)
+      else
+        new[k] = value
+      end
+    end
+    new
+  end
+
   def []=(key,value)
     delete(key)
     super(key,value)
@@ -28,16 +41,22 @@ module IndiferentHash
 
   def [](key)
     res = super(key) 
-    return res unless res.nil? or (_default? and not keys.include? key)
 
-    case key
-    when Symbol, Module
-      super(key.to_s)
-    when String
-      super(key.to_sym)
-    else
-      res
+    if ! (res.nil? || (_default? and not keys.include?(key)))
+      IndiferentHash.setup(res) if Hash === res
+      return res
     end
+
+    res = case key
+          when Symbol, Module
+            super(key.to_s)
+          when String
+            super(key.to_sym)
+          else
+            res
+          end
+    IndiferentHash.setup(res) if Hash === res
+    res
   end
 
   def values_at(*key_list)

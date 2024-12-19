@@ -22,5 +22,16 @@ class TestClass < Test::Unit::TestCase
     assert_equal 2, a["B"]
     assert_equal 2, a[:b]
   end
+
+  def test_deep_merge
+    o = {h: {a: 1, b: 2}}
+    n = {h: {c: 3}}
+
+    IndiferentHash.setup(o)
+    o = o.deep_merge(n)
+
+    assert_equal 1, o[:h]["a"]
+    assert_equal 3, o[:h]["c"]
+  end
 end
 
