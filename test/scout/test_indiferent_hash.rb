@@ -33,5 +33,12 @@ class TestClass < Test::Unit::TestCase
     assert_equal 1, o[:h]["a"]
     assert_equal 3, o[:h]["c"]
   end
+
+  def test_except
+    h = {:a => 1, "b" => 2}
+    IndiferentHash.setup(h)
+    assert_equal [:a], h.except(:b).keys
+    assert_equal ["b"], h.except("a").keys
+  end
 end
 

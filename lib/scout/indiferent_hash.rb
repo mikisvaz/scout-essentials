@@ -122,5 +122,23 @@ module IndiferentHash
   def prety_print
     Misc.format_definition_list(self, sep: "\n")
   end
+
+  def except(*list)
+    full_list = list.dup
+
+    list.each do |e|
+      begin
+        if String === e
+          full_list << e.to_sym
+        else
+          full_list << e.to_s
+        end
+      rescue
+        next
+      end
+    end
+
+    super(*full_list)
+  end
 end
 
