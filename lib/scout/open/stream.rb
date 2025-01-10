@@ -407,7 +407,8 @@ module Open
     str
   end
 
-  def self.sort_stream(stream, header_hash: "#", cmd_args: "-u", memory: false)
+  def self.sort_stream(stream, header_hash: "#", cmd_args: nil, memory: false)
+    cmd_args = '-u' if cmd_args.nil?
     sout = Open.open_pipe do |sin|
       ConcurrentStream.process_stream(stream) do
         line = stream.gets
