@@ -98,7 +98,12 @@ module Path
   end
 
   def unset_extension
-    self.annotate(self.split(".")[0..-2] * ".")
+    parts = self.split("/")
+    basename = parts.pop
+    return self unless basename.include?(".")
+    basename = basename.split(".")[0..-2] * "."
+    parts.push basename
+    self.annotate(parts * "/")
   end
 
   def remove_extension(extension = nil)

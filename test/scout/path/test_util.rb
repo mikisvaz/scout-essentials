@@ -18,5 +18,13 @@ class TestPathUtil < Test::Unit::TestCase
       assert_equal %w(foo bar).sort, tmpdir.glob.collect{|p| p.basename }.sort
     end
   end
+
+  def test_unset_extension
+    path = Path.setup("/home/.scout/dir/file.txt")
+    assert_equal "/home/.scout/dir/file", path.unset_extension
+
+    path = Path.setup("/home/.scout/dir/file")
+    assert_equal "/home/.scout/dir/file", path.unset_extension
+  end
 end
 
