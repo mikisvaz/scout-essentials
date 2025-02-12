@@ -52,7 +52,7 @@ module Misc
   end
 
   def self.variance(list)
-    return nil if list.length < 3
+    return nil if list.length < 2
     mean = mean(list)
     list = list.compact
     list_length = list.length
@@ -66,9 +66,8 @@ module Misc
     total_square_distance / (list_length - 1)
   end
 
-
   def self.sd(list)
-    return nil if list.length < 3
+    return nil if list.length < 2
     variance = self.variance(list)
     Math.sqrt(variance)
   end
