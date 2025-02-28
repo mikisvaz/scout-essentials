@@ -52,7 +52,23 @@ module Misc
       ENV[var] = old_value
     end
   end
-  
+
+  def self.with_envs(hash, &block)
+    old_value = {}
+    begin
+      hash.each do |var,value|
+        old_value[var] = ENV[var]
+        ENV[var] = value
+      end
+      yield
+    ensure
+      old_value.each do |var,value|
+        ENV[var] = value
+      end
+    end
+  end
+
+
   def self.update_git(gem_name = 'scout-essentials')
     gem_name = 'scout-essentials' if gem_name.nil?
     dir = File.join(__dir__, '../../../../', gem_name)

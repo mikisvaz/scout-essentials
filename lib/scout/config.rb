@@ -89,7 +89,19 @@ module Scout::Config
   # For equal priorities the matching prioritizes tokens ealier in the list
   def self.get(key, *tokens)
     options = tokens.pop if Hash === tokens.last
+    options = IndiferentHash.setup options if options
+
     default = options.nil? ? nil : options[:default]
+    env = options.nil? ? nil : options[:env]
+
+    if env
+      env.split(/,\s*/).each do |variable|
+        if ENV[variable]
+          default = ENV[variable]
+          break
+        end
+      end
+    end
 
     tokens = ["key:" + key] if tokens.empty?
 
@@ -120,12 +132,16 @@ module Scout::Config
     value = priorities.empty? ? default : priorities.collect{|p| p }.sort_by{|p,v| p}.first.last.first
     value = false if value == 'false'
 
-    Log.debug "Value #{value.inspect} for config key '#{ key }': #{tokens * ", "}"
+    Log.debug "Value #{value.inspect} for config key '#{ key }': #{tokens * ", "}" + (env ? " env:#{env}" : '')
     GOT_KEYS << [key, value, tokens]
 
     if String === value && m = value.match(/^env:(.*)/)
-      variable = m.captures.first
-      ENV[variable]
+      variables = m.captures.first
+      variables.split(/,\s*/).each do |variable|
+        value = ENV[variable]
+        return value if value
+      end
+      nil
     elsif value == 'nil'
       nil
     else

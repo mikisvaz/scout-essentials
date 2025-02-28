@@ -63,4 +63,20 @@ class TestConfig < Test::Unit::TestCase
     Scout::Config.add_entry 'key', 'V1', 'token1'
     assert_equal "V3", Scout::Config.get('key', 'token2', :default => 'V3')
   end
+
+  def test_env
+    Misc.with_env "TEST_VAR", "TEST" do
+      assert_equal "TEST", Scout::Config.get("value", :key, :env => "TEST_VAR")
+      Scout::Config.set "value", 'env:TEST_VAR', 'key'
+      assert_equal "TEST", Scout::Config.get(:value, :key)
+    end
+  end
+
+  def test_env_multiple
+    Misc.with_env "TEST_VAR", "TEST" do
+      assert_equal "TEST", Scout::Config.get("value", :key, :env => "TEST_VAR,TESTVAR")
+      Scout::Config.set "value", 'env:TEST_VAR,TESTVAR', 'key'
+      assert_equal "TEST", Scout::Config.get(:value, :key)
+    end
+  end
 end
