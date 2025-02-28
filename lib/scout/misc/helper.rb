@@ -34,17 +34,18 @@ module Misc
   def self.chunk(array, size)
     total = array.length
     current = 0
-    res = [] unless block_given?
+    res = []
     while current < total
       last = current + size - 1
       if block_given?
-        yield array[current..last]
+        r = yield array[current..last]
+        res.concat r if Array === r
       else
         res << array[current..last]
       end
       current = last + 1
     end
-    block_given? ? nil : res
+    res
   end
 
   # Divides the array into +num+ chunks of the same size by placing one
