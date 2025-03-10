@@ -19,6 +19,7 @@ Juwelier::Tasks.new do |gem|
   
   gem.add_runtime_dependency 'term-ansicolor'
   gem.add_runtime_dependency 'yaml'
+  gem.add_runtime_dependency 'rake'
 end
 Juwelier::RubygemsDotOrgTasks.new
 require 'rake/testtask'
