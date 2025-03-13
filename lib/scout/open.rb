@@ -1,4 +1,3 @@
-require_relative 'tmpfile'
 require_relative 'path'
 require_relative 'cmd'
 

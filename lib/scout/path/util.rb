@@ -48,7 +48,11 @@ module Path
 
   def glob(pattern = '*')
     if self.include? "*"
-      self.glob_all
+      if located?
+        Dir.glob(File.join(self, pattern))
+      else
+        self.glob_all
+      end
     else
       return [] unless self.exist? 
       found = self.find
@@ -69,7 +73,8 @@ module Path
 
     search_paths.keys.collect do |where| 
       found = find(where)
-      paths = pattern ? Dir.glob(File.join(found, pattern)) : Dir.glob(found) 
+
+      paths = pattern ? found.glob(pattern) : found.glob
 
       paths = paths.collect{|p| self.annotate p }
 

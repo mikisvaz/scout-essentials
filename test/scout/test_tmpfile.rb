@@ -17,7 +17,7 @@ class TestTmpFile < Test::Unit::TestCase
   def test_do_tmp_file_io
     content = "Hello World!"
     TmpFile.with_file(content) do |file1|
-      File.open(file1) do |io|
+      Open.open(file1) do |io|
         TmpFile.with_file(io) do |file|
           assert_equal content, File.open(file).read
         end

@@ -41,7 +41,6 @@ scout-essentials=/$PWD filter="*.rb *.txt *.md *.conf *.yaml" {
 
     trap.rb
    }
-   tmpfile.rb
    simple_opt.rb
    simple_opt=simple_opt{
     accessor.rb
@@ -67,6 +66,7 @@ scout-essentials=/$PWD filter="*.rb *.txt *.md *.conf *.yaml" {
     util.rb
     bgzf.rb
    }
+   tmpfile.rb
    resource.rb
    resource=resource{
     open.rb

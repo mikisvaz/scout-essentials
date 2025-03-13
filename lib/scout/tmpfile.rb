@@ -1,3 +1,4 @@
+require_relative 'open'
 require_relative 'misc'
 require_relative 'log'
 require 'fileutils'
@@ -32,7 +33,7 @@ module TmpFile
   def self.tmp_file(prefix = 'tmp-', max = 1_000_000_000, dir = nil)
     dir ||= TmpFile.tmpdir
     dir = dir.find if Path === dir
-    File.expand_path(File.join(dir, random_name(prefix, max)))
+    File.join(dir, random_name(prefix, max))
   end
 
   def self.with_file(content = nil, erase = true, options = {})
@@ -52,9 +53,9 @@ module TmpFile
     tmpfile = tmp_file prefix, max, tmpdir
     tmpfile += ".#{options[:extension]}" if options[:extension]
 
-    FileUtils.mkdir_p tmpdir
+    Open.mkdir tmpdir
     if IO === content
-      File.open(tmpfile, 'wb') do |f|
+      Open.open(tmpfile, mode: 'wb') do |f|
         begin
           while c = content.readpartial(1024)
             f << c
@@ -63,12 +64,12 @@ module TmpFile
         end
       end
     elsif !content.nil?
-      File.open(tmpfile, 'w') { |f| f.write content }
+      Open.write(tmpfile, content)
     end
 
     result = yield(tmpfile)
 
-    FileUtils.rm_rf tmpfile if File.exist?(tmpfile) && erase
+    Open.rm_rf tmpfile if Open.exist?(tmpfile) && erase
 
     result
   end
@@ -77,11 +78,11 @@ module TmpFile
     prefix = options[:prefix] || 'tmpdir-'
     tmpdir = tmp_file prefix
 
-    FileUtils.mkdir_p tmpdir
+    Open.mkdir tmpdir
 
     result = yield(tmpdir)
 
-    FileUtils.rm_rf tmpdir if File.exist?(tmpdir) && erase
+    Open.rm_rf tmpdir if Open.exist?(tmpdir) && erase
 
     result
   end
