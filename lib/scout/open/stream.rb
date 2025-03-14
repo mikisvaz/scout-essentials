@@ -105,7 +105,7 @@ module Open
 
     Open.lock tmp_path_lock, lock_options do
 
-      if File.exist? path and not force
+      if Open.exist? path and not force
         Log.warn "Path exists in sensible_write, not forcing update: #{ path }"
         Open.consume_stream content
       else

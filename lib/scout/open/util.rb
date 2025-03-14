@@ -103,48 +103,10 @@ module Open
     File.symlink?(path) && ! File.exist?(File.readlink(path))
   end
 
-  def self.directory?(file)
-    file = file.find if Path === file
-    File.directory?(file)
-  end
-
-  def self.exists?(file)
-    file = file.find if Path === file
-    File.exist?(file)
-  end
   class << self; alias exist? exists? end
 
   def self.exist_or_link?(file)
     self.exists?(file) || File.symlink?(file)
-  end
-
-  def self.mv(source, target, options = {})
-    target = target.find if Path === target
-    source = source.find if Path === source
-    FileUtils.mkdir_p File.dirname(target) unless File.exist?(File.dirname(target))
-    tmp_target = File.join(File.dirname(target), '.tmp_mv.' + File.basename(target))
-    FileUtils.mv source, tmp_target
-    FileUtils.mv tmp_target, target
-    return nil
-  end
-
-  def self.rm(file)
-    FileUtils.rm(file) if File.exist?(file) || Open.broken_link?(file)
-  end
-
-  def self.rm_rf(file)
-    FileUtils.rm_rf(file)
-  end
-
-  def self.touch(file)
-    FileUtils.touch(file)
-  end
-
-  def self.mkdir(target)
-    target = target.find if Path === target
-    if ! File.exist?(target)
-      FileUtils.mkdir_p target
-    end
   end
 
   def self.writable?(path)
@@ -158,43 +120,10 @@ module Open
     end
   end
 
-  def self.ctime(file)
-    file = file.find if Path === file
-    File.ctime(file)
-  end
-
   def self.realpath(file)
     file = file.find if Path === file
     Pathname.new(File.expand_path(file)).realpath.to_s 
   end
-
-  def self.mtime(file)
-    file = file.find if Path === file
-    begin
-      if File.symlink?(file) || File.stat(file).nlink > 1
-        if File.exist?(file + '.info') && defined?(Step)
-          done = Persist.load(file + '.info', Step::SERIALIZER)[:done]
-          return done if done
-        end
-
-        file = Pathname.new(file).realpath.to_s 
-      end
-      return nil unless File.exist?(file)
-      File.mtime(file)
-    rescue
-      nil
-    end
-  end
-
-  def self.cp(source, target, options = {})
-    source = source.find if Path === source
-    target = target.find if Path === target
-
-    FileUtils.mkdir_p File.dirname(target) unless File.exist?(File.dirname(target))
-    FileUtils.rm_rf target if File.exist?(target)
-    FileUtils.cp_r source, target
-  end
-
 
   def self.ln_s(source, target, options = {})
     source = source.find if Path === source

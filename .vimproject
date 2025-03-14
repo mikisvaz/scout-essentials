@@ -60,6 +60,7 @@ scout-essentials=/$PWD filter="*.rb *.txt *.md *.conf *.yaml" {
    cmd.rb
    open.rb
    open=open{
+    final.rb
     lock.rb
     remote.rb
     stream.rb
