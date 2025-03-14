@@ -21,6 +21,7 @@ scout-essentials=/$PWD filter="*.rb *.txt *.md *.conf *.yaml" {
     monitor.rb
     system.rb
     math.rb
+    hook.rb
    }
    named_array.rb
    indiferent_hash.rb
