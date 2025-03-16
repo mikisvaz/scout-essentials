@@ -57,7 +57,6 @@ module ScoutRake
         end
       rescue Exception
         Log.error "Error in rake: #{$!.message}"
-        Log.exception $!
         Kernel.exit! -1
       end
       Kernel.exit! 0
