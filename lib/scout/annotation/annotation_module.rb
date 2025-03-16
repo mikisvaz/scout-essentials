@@ -1,7 +1,8 @@
 module Annotation
   module AnnotationModule
     def annotation(*attrs)
-      self.instance_variable_get("@annotations").concat attrs
+      annotations = self.instance_variable_get("@annotations")
+      annotations.concat attrs - annotations
       attrs.each do |a|
         self.attr_accessor a
       end
