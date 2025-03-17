@@ -42,10 +42,10 @@ module Path
     file = map.sub('{PKGDIR}', pkgdir).
       sub('{HOME}', ENV["HOME"]).
       sub('{RESOURCE}', path.pkgdir.to_s).
-      sub('{PWD}', FileUtils.pwd).
-      sub('{TOPLEVEL}', path._toplevel).
-      sub('{SUBPATH}', path._subpath).
-      sub('{BASENAME}', File.basename(path)).
+      sub('{PWD}'){ FileUtils.pwd }.
+      sub('{TOPLEVEL}'){ path._toplevel }.
+      sub('{SUBPATH}'){ path._subpath }.
+      sub('{BASENAME}'){ File.basename(path)}.
       sub('{PATH}', path).
       sub('{LIBDIR}'){ path.libdir || (path.pkgdir.respond_to?(:libdir) && path.pkgdir.libdir) || Path.caller_lib_dir || "NOLIBDIR" }.
       sub('{MAPNAME}', map_name.to_s).

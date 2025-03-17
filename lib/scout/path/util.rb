@@ -8,7 +8,10 @@ module Path
   def self.is_filename?(string, need_to_exists = true)
     return false if string.nil?
     return true if Path === string
-    return true if String === string and ! string.include?("\n") and string.split("/").select{|p| p.length > 265 }.empty? and (! need_to_exists || File.exist?(string))
+    return true if String === string and
+      ! string.include?("\n") and
+      (string.length < 265 || string.split("/").select{|p| p.length > 265 }.empty?) and
+      (! need_to_exists || File.exist?(string))
     return false
   end
 
