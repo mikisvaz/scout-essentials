@@ -2,7 +2,7 @@ module Misc
 
   def self.hostname
     @@hostname ||= begin
-                     `hostname`.strip
+                     (ENV["HOSTNAME"] || `hostname`).strip
                    end
   end
 
