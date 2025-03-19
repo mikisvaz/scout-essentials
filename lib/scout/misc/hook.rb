@@ -12,14 +12,14 @@ module Hook
       orig_name = ("orig_" + method_name.to_s).to_sym
       if not base_class.singleton_methods.include?(orig_name)
         base_class.singleton_class.alias_method orig_name, method_name
-        base_class.define_singleton_method method_name do |*args|
+        base_class.define_singleton_method method_name do |*args,&block|
           base_class.class_variable_get(:@@hooks).each do |hook|
             next if hook.respond_to?(:claim) and not hook.claim(*args)
             if hook.respond_to?(method_name)
-              return hook.send(method_name, *args)
+              return hook.send(method_name, *args, &block)
             end
           end
-          return base_class.send(orig_name, *args)
+          return base_class.send(orig_name, *args, &block)
         end
       end
     end
@@ -29,15 +29,14 @@ module Hook
       orig_name = ("orig_" + method_name.to_s).to_sym
       if not base_class.instance_methods.include?(orig_name)
         base_class.alias_method orig_name, method_name
-        base_class.define_method method_name do |*args|
+        base_class.define_method method_name do |*args,&block|
           base_class.class_variable_get(:@@hooks).each do |hook|
             next if hook.respond_to?(:claim) and not hook.claim(self, *args)
             if hook.instance_methods.include?(method_name)
-              return hook.instance_method(method_name).bind(self).call *args
-              #return self.instance_exec *args, &hook.instance_method(method_name)
+              return hook.instance_method(method_name).bind(self).call *args, &block
             end
           end
-          return self.send(orig_name, *args)
+          return self.send(orig_name, *args, &block)
         end
       end
     end
