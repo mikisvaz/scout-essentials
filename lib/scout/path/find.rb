@@ -7,7 +7,7 @@ module Path
       caller_dup = caller.dup
       while file = caller_dup.shift
         break unless file =~ /(?:scout|rbbt)\/(?:resource\.rb|workflow\.rb)/ or
-          file =~ /(?:scout|rbbt)\/(?:.*\/)?(path|open|tsv|refactor)\.rb/ or
+          file =~ /(?:scout|rbbt)\/(?:.*\/)?(path|open|final|tsv|refactor)\.rb/ or
           file =~ /(?:scout|rbbt)\/(?:.*\/)?path\/(?:find|refactor|util)\.rb/ or
           file =~ /(?:scout|rbbt)\/persist.rb/ or
           file =~ /scout\/resource\/produce.rb/ or
