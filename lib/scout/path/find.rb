@@ -50,7 +50,7 @@ module Path
       sub('{LIBDIR}'){ path.libdir || (path.pkgdir.respond_to?(:libdir) && path.pkgdir.libdir) || Path.caller_lib_dir || "NOLIBDIR" }.
       sub('{MAPNAME}', map_name.to_s).
       sub('{REMOVE}/', '').
-      sub('{REMOVE}', '').gsub(/\/+/,'/')
+      sub('{REMOVE}', '')
 
     while true
       file.gsub!(/\{(.+)(?<!\\)\/(.+)(?<!\\)\/(.+)\}/) do |m|
