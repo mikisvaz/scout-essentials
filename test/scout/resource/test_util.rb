@@ -35,5 +35,14 @@ class TestResourceUtil < Test::Unit::TestCase
       assert_equal path2, Resource.relocate(path1)
     end
   end
+
+  def ___test_s3
+    require 'scout-camp'
+    require 'scout/aws/s3'
+    p = Path.setup("s3://bucket/var/jobs/workflow/task/job.txt")
+    p.path_maps = {:bucket => 's3://bucket/{TOPLEVEL}/{SUBPATH}'}
+
+    assert_equal 'var/jobs/workflow/task/job.txt', Resource.identify(p)
+  end
 end
 
