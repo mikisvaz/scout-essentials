@@ -1,9 +1,9 @@
 module Resource
   def identify(path)
-    return path unless path.start_with?("/")
+    return path unless path.located?
     path_maps = path.path_maps if Path === path
     path_maps ||= self.path_maps || Path.path_maps
-    path = File.expand_path(path)
+    path = File.expand_path(path) if path.start_with?("/")
     path += "/" if File.directory?(path)
 
     map_order ||= (path_maps.keys & Path.basic_map_order) + (path_maps.keys - Path.basic_map_order)
@@ -30,7 +30,7 @@ module Resource
               m.named_captures.include?(c) ? m[c] : nil
             }.compact * "/"
 
-            unlocated.gsub!(/\/+/,'/')
+            #unlocated.gsub!(/\/+/,'/')
 
             if self.subdir && ! self.subdir.empty?
               subdir = self.subdir
