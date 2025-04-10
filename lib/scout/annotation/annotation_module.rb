@@ -1,8 +1,10 @@
+require 'scout/log'
 module Annotation
   module AnnotationModule
     def annotation(*attrs)
       annotations = self.instance_variable_get("@annotations")
-      annotations.concat attrs - annotations
+      attrs -= annotations
+      annotations.concat attrs
       attrs.each do |a|
         self.attr_accessor a
       end
@@ -13,8 +15,11 @@ module Annotation
     end
 
     def included(mod)
+      attrs = self.instance_variable_get("@annotations")
       mod.instance_variable_set(:@annotations, []) unless mod.instance_variables.include?(:@annotations)
-      mod.instance_variable_get(:@annotations).concat self.instance_variable_get(:@annotations)
+      annotations = mod.instance_variable_get(:@annotations)
+      attrs -= annotations
+      annotations.concat attrs
     end
 
     def extended(obj)
@@ -24,6 +29,7 @@ module Annotation
       obj.annotation_types << self
 
       annotations = obj.instance_variable_get(:@annotations)
+      attrs -= annotations
       annotations.concat attrs
     end
 
