@@ -5,6 +5,7 @@ require_relative 'resource/path'
 require_relative 'resource/open'
 require_relative 'resource/util'
 require_relative 'resource/software'
+require_relative 'resource/sync'
 
 module Resource
   extend Annotation

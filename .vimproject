@@ -66,6 +66,7 @@ scout-essentials=/$PWD filter="*.rb *.txt *.md *.conf *.yaml" {
     remote.rb
     stream.rb
     util.rb
+    sync.rb
     bgzf.rb
    }
    tmpfile.rb
@@ -76,6 +77,7 @@ scout-essentials=/$PWD filter="*.rb *.txt *.md *.conf *.yaml" {
     produce.rb
     scout.rb
     software.rb
+    sync.rb
     util.rb
    }
    config.rb

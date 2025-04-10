@@ -6,6 +6,7 @@ require_relative 'open/stream'
 require_relative 'open/util'
 require_relative 'open/remote'
 require_relative 'open/lock'
+require_relative 'open/sync'
 
 module Open
   module NamedStream
