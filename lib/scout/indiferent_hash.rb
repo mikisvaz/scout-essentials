@@ -115,8 +115,25 @@ module IndiferentHash
   def keys_to_sym!
     string_keys = keys.select{|k| String === k}
     string_keys.each do |key|
-      self[key.to_sym] = self.delete(key)
+      begin
+        self[key.to_sym] = self.delete(key)
+      rescue
+        next
+      end
     end
+  end
+
+  def keys_to_sym
+    new = IndiferentHash.setup({})
+    self.keys.each do |key|
+      begin
+        skey = key.is_a?(String) ? key.to_sym : key
+      rescue
+        skey = key
+      end
+      new[skey] = self[key]
+    end
+    new
   end
 
   def prety_print
