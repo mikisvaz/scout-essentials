@@ -15,7 +15,7 @@ module Resource
     attr_accessor :default_resource
 
     def default_resource
-      @default_resource ||= Scout
+      @default_resource
     end
   end
 

@@ -1,6 +1,6 @@
 module Resource
   def identify(path)
-    return path unless path.located?
+    return path unless Path.located?(path)
     path_maps = path.path_maps if Path === path
     path_maps ||= self.path_maps || Path.path_maps
     path = File.expand_path(path) if path.start_with?("/")

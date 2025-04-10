@@ -10,6 +10,11 @@ class TestResourceUtil < Test::Unit::TestCase
     assert_equal 'share/data/somedir/somepath', Scout.identify(path)
   end
 
+  def test_identify_dir
+    path = Path.setup('share/data/somedir/').find
+    assert_equal 'share/data/somedir', Scout.identify(path)
+  end
+
   def test_identify_with_subdir
     m = Module.new
     m.extend Resource

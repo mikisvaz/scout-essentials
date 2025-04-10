@@ -141,9 +141,13 @@ module Path
 
   SLASH = "/"[0]
   DOT = "."[0]
-  def located?
+  def self.located?(path)
     # OPEN RESOURCE
-    self.slice(0,1) == SLASH || (self.slice(0,1) == DOT && self.slice(1,2) == SLASH) # || (resource != Rbbt && (Open.remote?(self) || Open.ssh?(self)))
+    path.slice(0,1) == SLASH || (path.slice(0,1) == DOT && path.slice(1,2) == SLASH)
+  end
+
+  def located?
+    Path.located?(self)
   end
 
   def annotate_found_where(found, where)

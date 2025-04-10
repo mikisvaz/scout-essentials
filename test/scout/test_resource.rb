@@ -1,6 +1,7 @@
 require File.expand_path(__FILE__).sub(%r(/test/.*), '/test/test_helper.rb')
 require File.expand_path(__FILE__).sub(%r(.*/test/), '').sub(/test_(.*)\.rb/,'\1')
 
+require 'scout'
 require 'scout/resource/scout'
 class TestResourceUnit < Test::Unit::TestCase
   module TestResource
@@ -22,5 +23,6 @@ class TestResourceUnit < Test::Unit::TestCase
     assert_equal 'share/databases/DATABASE/FILE', Resource.identify('/usr/local/share/scout/databases/DATABASE/FILE')
     assert_equal 'share/databases/DATABASE/FILE', Resource.identify(File.join(ENV["HOME"], '.scout/share/databases/DATABASE/FILE'))
     assert_equal 'share/databases/DATABASE/FILE', Resource.identify('/usr/local/share/scout/databases/DATABASE/FILE')
+    assert_equal 'share/databases/DATABASE/FILE', Resource.identify('/usr/local/share/scout/databases/DATABASE/FILE/')
   end
 end
