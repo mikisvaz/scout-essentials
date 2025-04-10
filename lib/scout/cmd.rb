@@ -92,7 +92,7 @@ module CMD
   end
 
   def self.bash(cmd)
-    cmd = %Q(bash <<EOF\n#{cmd}\nEOF\n)
+    cmd = %Q(bash -l <<EOF\n#{cmd}\nEOF\n)
     CMD.cmd(cmd, :autojoin => true)
   end
 
