@@ -39,9 +39,11 @@ module SOPT
     end
 
     IndiferentHash.setup @@current_options
+    @@current_options.keys_to_sym!
+
     GOT_OPTIONS.merge! @@current_options
 
-    @@current_options.keys_to_sym
+    @@current_options
   end
   
   def self.get(opt_str)
