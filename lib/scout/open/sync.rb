@@ -36,7 +36,6 @@ module Open
       Open.mkdir File.dirname(target)
     end
 
-
     Log.low "Migrating #{source} #{files.length} files to #{target} - #{Misc.fingerprint(files)}}" if files
 
 

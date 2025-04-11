@@ -10,8 +10,8 @@ class TestPathFind < Test::Unit::TestCase
     assert_equal "data/some_file", path._subpath
 
     path = Path.setup("data", 'scout')
-    assert_equal "", path._toplevel
-    assert_equal "data", path._subpath
+    assert_equal "data", path._toplevel
+    assert_equal nil, path._subpath
   end
 
   def test_find_local
@@ -137,6 +137,13 @@ class TestPathFind < Test::Unit::TestCase
         end
       end
     end
+  end
+
+  def test_single
+    file = Path.setup('foo')
+    assert_equal 'foo', file._toplevel
+    assert_equal nil, file._subpath
+    assert_equal '/usr/local/foo/scout/', file.find(:local)
   end
 end
 

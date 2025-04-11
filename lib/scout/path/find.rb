@@ -132,11 +132,11 @@ module Path
   end
 
   def _subpath
-    @subpath ||= _parts.length > 1 ? _parts[1..-1] * "/" : _parts[0] || ""
+    @subpath ||= _parts.length > 1 ? _parts[1..-1] * "/" : nil
   end
 
   def _toplevel
-    @toplevel ||= _parts.length > 1 ? _parts[0] : ""
+    @toplevel ||= _parts[0]
   end
 
   SLASH = "/"[0]
