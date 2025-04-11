@@ -121,7 +121,7 @@ module Path
       begin
         Log.debug "Loading search_paths from #{filename}"
         YAML.load(filename.read).each do |where, location|
-          @@path_maps[where.to_sym] = location
+          add_path where.to_sym, location
         end
       rescue
         Log.error "Error loading search_paths from #{filename}: " << $!.message
