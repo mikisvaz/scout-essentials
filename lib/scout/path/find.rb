@@ -117,6 +117,7 @@ module Path
   def self.load_path_maps(filename)
     Path.setup(filename) unless Path === filename
     if filename.exist?
+      filename = filename.find
       begin
         Log.debug "Loading search_paths from #{filename}"
         YAML.load(filename.read).each do |where, location|
@@ -125,6 +126,8 @@ module Path
       rescue
         Log.error "Error loading search_paths from #{filename}: " << $!.message
       end
+    else
+      Log.debug "Could not find search_paths file #{filename}"
     end
   end
 
