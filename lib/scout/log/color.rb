@@ -155,6 +155,8 @@ module Log
     :time => cyan,
     :task => yellow,
     :workflow => yellow,
+    :present => green,
+    :missing => cyan,
   })
   HIGHLIGHT = "\033[1m"
 
