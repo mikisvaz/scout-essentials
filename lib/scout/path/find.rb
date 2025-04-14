@@ -188,10 +188,11 @@ module Path
   end
 
   def self.exists_file_or_alternatives(file)
-    return file if File.exist?(file) or File.directory?(file)
+    file = file.purge if Path === file
+    return file if Open.exist?(file) or Open.directory?(file)
     %w(gz bgz zip).each do |extension|
       alt_file = file + '.' + extension
-      return alt_file if File.exist?(alt_file) or File.directory?(alt_file)
+      return alt_file if Open.exist?(alt_file) or Open.directory?(alt_file)
     end
     nil
   end
