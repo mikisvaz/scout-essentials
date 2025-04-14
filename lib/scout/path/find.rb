@@ -188,7 +188,7 @@ module Path
   end
 
   def self.exists_file_or_alternatives(file)
-    file = file.purge if Path === file
+    file = file.dup if Path === file
     return file if Open.exist?(file) or Open.directory?(file)
     %w(gz bgz zip).each do |extension|
       alt_file = file + '.' + extension
