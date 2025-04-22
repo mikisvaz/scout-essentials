@@ -141,6 +141,11 @@ module Open
     end
   end
 
+  def self.size(file)
+    file = file.find if Path === file
+    File.size(file)
+  end
+
   def self.ln_s(source, target, options = {})
     source = source.find if Path === source
     target = target.find if Path === target
