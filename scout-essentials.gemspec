@@ -11,7 +11,7 @@ Gem::Specification.new do |s|
   s.required_rubygems_version = Gem::Requirement.new(">= 0".freeze) if s.respond_to? :required_rubygems_version=
   s.require_paths = ["lib".freeze]
   s.authors = ["Miguel Vazquez".freeze]
-  s.date = "2025-04-16"
+  s.date = "1980-01-02"
   s.description = "Things a scout can use anywhere".freeze
   s.email = "mikisvaz@gmail.com".freeze
   s.extra_rdoc_files = [
@@ -146,7 +146,7 @@ Gem::Specification.new do |s|
   ]
   s.homepage = "http://github.com/mikisvaz/scout-essentials".freeze
   s.licenses = ["MIT".freeze]
-  s.rubygems_version = "3.6.6".freeze
+  s.rubygems_version = "3.6.7".freeze
   s.summary = "Scout essential tools".freeze
 
   s.specification_version = 4
