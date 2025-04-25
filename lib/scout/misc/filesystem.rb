@@ -33,7 +33,7 @@ module Misc
     end
   end
 
-  def self.tarize(source_dir, archive_path)
+  def self.tarize(source_dir, archive_path = nil)
     require 'rubygems/package'
     require 'zlib'
     require 'stringio'
@@ -57,10 +57,18 @@ module Misc
 
     tar_io.rewind
 
-    File.open(archive_path, 'wb') do |f|
-      gz = Zlib::GzipWriter.new(f)
-      gz.write(tar_io.string)
-      gz.close
+    if archive_path
+      File.open(archive_path, 'wb') do |f|
+        gz = Zlib::GzipWriter.new(f)
+        gz.write(tar_io.string)
+        gz.close
+      end
+    else
+      Open.open_pipe do |f|
+        gz = Zlib::GzipWriter.new(f)
+        gz.write(tar_io.string)
+        gz.close
+      end
     end
   end
 
