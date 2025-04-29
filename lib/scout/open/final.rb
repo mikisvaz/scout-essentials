@@ -89,6 +89,8 @@ module Open
   end
 
   def self.touch(file)
+    file = file.find if Path === file
+    Open.mkdir File.dirname(file)
     FileUtils.touch(file)
   end
 
