@@ -42,5 +42,9 @@ class TestOptions < Test::Unit::TestCase
     hash = {:a => /test/}
     assert_equal({}, IndiferentHash.string2hash(IndiferentHash.hash2string(hash)))
   end
+
+  def test_parse_options
+    assert_include IndiferentHash.parse_options('blueberries=true title="This is a title" list=one,two,"and three"'), "title"
+  end
 end
 

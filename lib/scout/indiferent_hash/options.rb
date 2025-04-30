@@ -93,13 +93,51 @@ module IndiferentHash
     }.compact * "#"
   end
 
-  def self.string2hash(string)
+  def self.string2hash(string, sep="#")
     options = {}
 
-    string.split('#').each do |str|
+    string.split(sep).each do |str|
       key, _, value = str.partition "="
 
       key = key[1..-1].to_sym if key[0] == ":"
+
+      options[key] = true and next if value.empty?
+      options[key] = value[1..-1].to_sym and next if value[0] == ":"
+      options[key] = Regexp.new(/#{value[1..-2]}/) and next if value[0] == "/" and value[-1] == "/"
+      options[key] = value[1..-2] and next if value =~ /^['"].*['"]$/
+      options[key] = value.to_i and next if value =~ /^\d+$/
+      options[key] = value.to_f and next if value =~ /^\d*\.\d+$/
+      options[key] = true and next if value == "true"
+      options[key] = false and next if value == "false"
+      options[key] = value
+    end
+
+    IndiferentHash.setup(options)
+  end
+
+  def self.parse_options(str)
+    options = {}
+    # Match key=value pairs, supporting quoted values with spaces
+    str.scan(/(\w+)=("[^"]*"|[^\s"]+)/) do |key, raw_value|
+      value = raw_value.strip
+
+      # Remove surrounding quotes if present
+      if value.start_with?('"') && value.end_with?('"')
+        value = value[1..-2]
+      end
+
+      # Split by commas, but preserve quoted substrings as single elements
+      if value.include?(',')
+        # This regex splits on commas not inside quotes
+        parts = value.scan(/"[^"]*"|[^,]+/).map do |v|
+          v = v.strip
+          v = v[1..-2] if v.start_with?('"') && v.end_with?('"')
+          v
+        end
+        value = parts
+        options[key] = value
+        next
+      end
 
       options[key] = true and next if value.empty?
       options[key] = value[1..-1].to_sym and next if value[0] == ":"
