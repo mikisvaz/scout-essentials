@@ -45,6 +45,7 @@ class TestOptions < Test::Unit::TestCase
 
   def test_parse_options
     assert_include IndiferentHash.parse_options('blueberries=true title="This is a title" list=one,two,"and three"'), "title"
+    assert_include IndiferentHash.parse_options('source="=>Alias"'), "source"
   end
 end
 
