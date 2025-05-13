@@ -152,4 +152,23 @@ module IndiferentHash
 
     IndiferentHash.setup(options)
   end
+
+  def self.print_options(options)
+    options.map do |key, value|
+      if value.is_a?(Array)
+        vals = value.map do |v|
+          if v.to_s.empty? || v.to_s.include?(' ')
+            "\"#{v}\""
+          else
+            v.to_s
+          end
+        end
+        "#{key}=#{vals.join(',')}"
+      else
+        val = value.to_s
+        val = "\"#{val}\"" if val.empty? || val.include?(' ')
+        "#{key}=#{val}"
+      end
+    end.join(' ')
+  end
 end
