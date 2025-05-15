@@ -147,7 +147,7 @@ module Path
   DOT = "."[0]
   def self.located?(path)
     # OPEN RESOURCE
-    path.slice(0,1) == SLASH || (path.slice(0,1) == DOT && path.slice(1,2) == SLASH)
+    path.slice(0,1) == SLASH || (path.slice(0,1) == DOT && path.slice(1,1) == SLASH)
   end
 
   def located?
