@@ -49,16 +49,17 @@ module Path
     self.annotate(File.basename(self))
   end
 
-  def glob(pattern = '*')
+  def glob(pattern = "*")
     if self.include? "*"
       if located?
-        Dir.glob(File.join(self, pattern))
+        Dir.glob(self)
       else
         self.glob_all
       end
     else
       return [] unless self.exist? 
       found = self.find
+
       exp = File.join(found, pattern)
       paths = Dir.glob(exp).collect{|f| self.annotate(f) }
 
