@@ -10,6 +10,12 @@ class TestResourceUtil < Test::Unit::TestCase
     assert_equal 'share/data/somedir/somepath', Scout.identify(path)
   end
 
+  def test_identify_lib
+    p = Scout.data.file.find(:lib)
+    assert p.located?
+    assert_equal "data/file", p.identify
+  end
+
   def test_identify_dir
     path = Path.setup('share/data/somedir/').find
     assert_equal 'share/data/somedir', Scout.identify(path)
@@ -29,8 +35,8 @@ class TestResourceUtil < Test::Unit::TestCase
       Path.setup dir
 
       path_base = Path.setup("basedir").someother.file
-      path_base.path_maps[:subdir1] = File.join(dir, 'subdir1', '{PATH}')
-      path_base.path_maps[:subdir2] = File.join(dir, 'subdir2', '{PATH}')
+      path_base.add_path :subdir1, File.join(dir, 'subdir1', '{PATH}')
+      path_base.add_path :subdir2, File.join(dir, 'subdir2', '{PATH}')
 
       path1 = path_base.find(:subdir1)
       path2 = path_base.find(:subdir2)

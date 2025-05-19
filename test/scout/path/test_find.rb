@@ -110,7 +110,7 @@ class TestPathFind < Test::Unit::TestCase
     path = Path.setup("somefile")
     TmpFile.with_path do |tmpdir|
       Open.write(tmpdir.somefile, 'test')
-      path.path_maps["tmpdir"] = tmpdir
+      path.add_path :tmpdir, tmpdir
       assert path.exists?
     end
   end

@@ -2,13 +2,18 @@ module Resource
   def identify(path)
     path = Path.setup path unless Path === path
     return path unless path.located?
+
     path_maps = path.path_maps if Path === path
     path_maps ||= self.path_maps || Path.path_maps
-    path = File.expand_path(path) if path.start_with?("/")
-    path += "/" if File.directory?(path)
 
-    map_order ||= (path_maps.keys & Path.basic_map_order) + (path_maps.keys - Path.basic_map_order)
+    map_order = path.map_order
+    map_order ||= Path.map_order
     map_order -= [:current, "current"]
+
+    libdir = Path.caller_lib_dir
+
+    path = File.expand_path(path) if path.start_with?('/')
+    path += "/" if File.directory?(path) and not path.end_with?('/')
 
     choices = []
     map_order.uniq.each do |name|
@@ -22,6 +27,7 @@ module Resource
         regexp = "^" + pattern
           .gsub(/{(TOPLEVEL)}/,'(?<\1>[^/]+)')
           .gsub(/\.{(PKGDIR)}/,'\.(?<\1>[^/]+)')
+          .gsub(/{(LIBDIR)}/, libdir)
           .gsub(/\/{([^}]+)}/,'(?:/(?<\1>[^/]+))?') +
         "(?:/(?<REST>.+))?/?$"
         if m = path.match(regexp) 

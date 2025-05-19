@@ -1,8 +1,7 @@
 require_relative '../indiferent_hash'
 module Path
 
-  def self.caller_lib_dir(file = nil, relative_to = ['lib', 'bin'])
-
+  def self.caller_file(file = nil)
     if file.nil?
       caller_dup = caller.dup
       while file = caller_dup.shift
@@ -16,10 +15,24 @@ module Path
       return nil if file.nil?
       file = file.sub(/\.rb[^\w].*/,'.rb')
     end
+    file
+  end
+
+  def self.caller_lib_dir(file = nil, relative_to = ['lib', 'bin'])
+
+    file = caller_file(file)
+
+    return nil if file.nil?
+
+    file = File.expand_path(file)
+
+    return File.dirname(file) if not relative_to
 
     relative_to = [relative_to] unless Array === relative_to
-    file = File.expand_path(file)
-    return Path.setup(file) if relative_to.select{|d| File.exist? File.join(file, d)}.any?
+
+    if relative_to.select{|d| File.exist? File.join(file, d)}.any? 
+      return Path.setup(file)
+    end
 
     while file != '/'
       dir = File.dirname file
@@ -75,18 +88,28 @@ module Path
       :cache   => '/cache/{TOPLEVEL}/{PKGDIR}/{SUBPATH}',
       :bulk    => '/bulk/{TOPLEVEL}/{PKGDIR}/{SUBPATH}',
       :lib     => '{LIBDIR}/{TOPLEVEL}/{SUBPATH}',
-      :scout_essentials => File.join(Path.caller_lib_dir(__FILE__), "{TOPLEVEL}/{SUBPATH}"),
+      :scout_essentials_lib => File.join(Path.caller_lib_dir(__FILE__), "{TOPLEVEL}/{SUBPATH}"),
       :tmp     => '/tmp/{PKGDIR}/{TOPLEVEL}/{SUBPATH}',
       :default => :user
     })
   end
 
   def self.basic_map_order
-    @@basic_map_order ||= %w(current workflow user local global lib fast cache bulk)
+    @@basic_map_order ||= %w(current workflow user local global usr lib fast cache bulk).collect{|m| m.to_sym }
   end
 
   def self.map_order
-    @@map_order ||= (path_maps.keys & basic_map_order) + (path_maps.keys - basic_map_order)
+    @@map_order ||= 
+      begin
+        all_maps = path_maps.keys.collect{|m| m.to_s }.reverse
+        basic_map_order = self.basic_map_order.collect{|m| m.to_s }
+
+        lib_maps = all_maps.select{|m| m.end_with?('_lib') }
+        basic_map_order[basic_map_order.index 'lib'] = lib_maps + ['lib']
+        basic_map_order.flatten!
+
+        (basic_map_order & all_maps) + (all_maps - basic_map_order)
+      end.collect{|m| m.to_sym }
   end
 
   def self.add_path(name, map)
@@ -102,6 +125,21 @@ module Path
   def self.append_path(name, map)
     path_maps[name] = map
     map_order.push(name.to_sym)
+  end
+
+  def map_order
+    @map_order ||= 
+      begin
+        all_maps = path_maps.keys.collect{|m| m.to_s }.reverse
+        basic_map_order = Path.map_order.collect{|m| m.to_s }
+
+        (basic_map_order & all_maps) + (all_maps - basic_map_order)
+      end.collect{|m| m.to_sym }
+  end
+
+  def add_path(name, map)
+    path_maps[name] = map
+    @map_order = nil
   end
 
   def prepend_path(name, map)
@@ -216,6 +254,7 @@ module Path
     return follow(where) if where
 
     map_order.each do |map_name|
+      next unless path_maps.include?(map_name)
       found = follow(map_name, false)
 
       found = Path.exists_file_or_alternatives(found)

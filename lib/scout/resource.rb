@@ -7,6 +7,15 @@ require_relative 'resource/util'
 require_relative 'resource/software'
 require_relative 'resource/sync'
 
+require_relative 'log'
+require_relative 'path'
+require_relative 'resource/produce'
+require_relative 'resource/path'
+require_relative 'resource/open'
+require_relative 'resource/util'
+require_relative 'resource/software'
+require_relative 'resource/sync'
+
 module Resource
   extend Annotation
   annotation :pkgdir, :libdir, :subdir, :resources, :rake_dirs, :path_maps, :map_order, :lock_dir
@@ -24,7 +33,7 @@ module Resource
   end
 
   def path_maps
-    @path_maps ||= Path.path_maps.dup
+    @path_maps ||= Path.path_maps
   end
 
   def subdir

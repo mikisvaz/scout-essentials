@@ -1,5 +1,4 @@
 require_relative 'annotation'
-require_relative 'path/find'
 require_relative 'path/util'
 require_relative 'path/tmpfile'
 require_relative 'path/digest'
@@ -28,10 +27,6 @@ module Path
     @path_maps ||= Path.path_maps.dup
   end
 
-  def map_order
-    @map_order ||= (path_maps.keys & Path.map_order) + (path_maps.keys - Path.map_order)
-  end
-
   def join(subpath = nil, prevpath = nil)
     return self if subpath.nil?
 
@@ -54,5 +49,5 @@ module Path
       join(name, prev)
     end
   end
-
 end
+require_relative 'path/find'

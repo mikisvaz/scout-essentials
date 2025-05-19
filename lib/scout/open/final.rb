@@ -199,4 +199,8 @@ module Open
     FileUtils.cp_lr(source, target)
   end
 
+  def self.same_file(file1, file2)
+    File.identical?(file1, file2)
+  end
+
 end
