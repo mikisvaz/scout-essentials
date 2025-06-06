@@ -97,7 +97,7 @@ module SOPT
 
       name  = SOPT.input_format(name, type.to_sym, default, shortcut) 
       Misc.format_definition_list_item(name, description)
-    end * "\n"
+    end.compact * "\n"
   end
 
 
