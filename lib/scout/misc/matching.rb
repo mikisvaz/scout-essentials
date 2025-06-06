@@ -2,7 +2,7 @@ module Misc
   def self._convert_match_condition(condition)
     return true if condition == 'true'
     return false if condition == 'false'
-    return condition.to_regexp if condition[0] == "/"
+    return Regexp.new(condition[1..-2]) if condition[0] == "/"
     return [:cmp, $1, $2.to_f] if condition =~ /^([<>]=?)(.*)/
     return [:invert, _convert_match_condition(condition[1..-1].strip)] if condition[0] == "!"
     #return {$1 => $2.to_f} if condition =~ /^([<>]=?)(.*)/
@@ -12,6 +12,9 @@ module Misc
 
   def self.match_value(value, condition)
     condition = _convert_match_condition(condition.strip) if String === condition
+
+    return true if value.nil? && condition.nil?
+    return false if value.nil?
 
     case condition
     when Regexp
