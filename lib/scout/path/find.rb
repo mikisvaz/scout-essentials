@@ -181,11 +181,14 @@ module Path
     @toplevel ||= _parts[0]
   end
 
+  HOME = "~"[0]
   SLASH = "/"[0]
   DOT = "."[0]
   def self.located?(path)
     # OPEN RESOURCE
-    path.slice(0,1) == SLASH || (path.slice(0,1) == DOT && path.slice(1,1) == SLASH)
+    path.slice(0,1) == SLASH || 
+      (path.slice(0,1) == HOME && path.slice(1,1) == SLASH) ||
+      (path.slice(0,1) == DOT && path.slice(1,1) == SLASH)
   end
 
   def located?
@@ -237,14 +240,14 @@ module Path
 
   def find(where = nil)
     if located?
-      if File.exist?(self)
-        return self if located?
+      if File.exist?(File.expand_path(self))
+        return self.annotate(File.expand_path(self))
       else
         found = Path.exists_file_or_alternatives(self)
         if found
           return self.annotate(found)
         else
-          return self if located?
+          return self
         end
       end
     end

@@ -8,7 +8,7 @@ module Open
     return Open.ssh(file, options) if Open.ssh?(file)
     return Open.wget(file, options) if Open.remote?(file)
 
-    File.open(file, mode)
+    File.open(File.expand_path(file), mode)
   end
 
   def self.file_write(file, content, mode = 'w')
@@ -117,7 +117,7 @@ module Open
 
   def self.exists?(file)
     file = file.find if Path === file
-    File.exist?(file)
+    File.exist?(File.expand_path(file))
   end
 
   def self.ctime(file)
