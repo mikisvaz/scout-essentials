@@ -23,7 +23,7 @@ module Path
         extension = ''
       end
 
-      post_fix = "--#{filename.length}@#{length}_#{Misc.digest(filename)[0..4]}" + extension
+      post_fix = "--#{filename.length}--#{Misc.digest(filename)[0..4]}" + extension
 
       filename = filename[0..(length - post_fix.length - 1)] << post_fix
     else
