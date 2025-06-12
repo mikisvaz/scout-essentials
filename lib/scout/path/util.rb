@@ -77,6 +77,7 @@ module Path
 
     search_paths.keys.collect do |where| 
       found = find(where)
+      next unless found.located?
 
       paths = pattern ? found.glob(pattern) : found.glob
 
