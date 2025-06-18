@@ -9,8 +9,10 @@ module Path
           file =~ /(?:scout|rbbt)\/(?:.*\/)?(path|open|final|tsv|refactor)\.rb/ or
           file =~ /(?:scout|rbbt)\/(?:.*\/)?path\/(?:find|refactor|util)\.rb/ or
           file =~ /(?:scout|rbbt)\/persist.rb/ or
+          file =~ /(?:scout|rbbt)\/(persist|workflow)\// or
           file =~ /scout\/resource\/produce.rb/ or
-          file =~ /modules\/rbbt-util/
+          file =~ /modules\/rbbt-util/ or
+          file =~ /^<internal:/
       end
       return nil if file.nil?
       file = file.sub(/\.rb[^\w].*/,'.rb')
