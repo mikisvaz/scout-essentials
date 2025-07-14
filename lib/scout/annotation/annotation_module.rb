@@ -41,6 +41,7 @@ module Annotation
       end
       obj = block if obj.nil?
       return nil if obj.nil?
+      obj = obj.dup if obj.frozen?
       begin
         obj.extend self unless self === obj
       rescue TypeError
