@@ -101,6 +101,14 @@ module Open
     end
   end
 
+  def self.mkfiledir(target)
+    target = target.find if Path === target
+    dir = File.dirname(target)
+    if ! File.exist?(dir)
+      FileUtils.mkdir_p dir
+    end
+  end
+
   def self.cp(source, target, options = {})
     source = source.find if Path === source
     target = target.find if Path === target
