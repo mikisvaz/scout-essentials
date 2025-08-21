@@ -37,6 +37,10 @@ module Path
     File.directory?(self.find)
   end
 
+  def relative_to(dir)
+    Misc.path_relative_to(File.expand_path(dir), self.find)
+  end
+
   def sub(*args)
     self.annotate super(*args)
   end
