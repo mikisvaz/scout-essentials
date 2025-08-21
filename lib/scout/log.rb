@@ -180,8 +180,8 @@ module Log
     else
       prefix = time << color(severity) << "["  << sev_str << "]" << color(0)
     end
-    message = "" << highlight << message << color(0) if severity >= INFO
-    str = prefix << " " << message.to_s
+    message = [highlight, message, color(0)].join if severity >= INFO
+    str = prefix + " " + message.to_s
 
     log_write str
 

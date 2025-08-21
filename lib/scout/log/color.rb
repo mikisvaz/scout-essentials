@@ -205,7 +205,7 @@ module Log
     str = str.to_s unless str.nil?
     return str if Symbol === color
     color_str = reset ? Term::ANSIColor.reset.dup : ""
-    color_str << color if color
+    color_str += color if color
     if str.nil?
       color_str
     else

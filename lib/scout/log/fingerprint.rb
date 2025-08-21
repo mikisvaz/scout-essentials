@@ -14,15 +14,15 @@ module Log
     when FalseClass
       "false"
     when Symbol
-      ":" << obj.to_s
+      ":" + obj.to_s
     when String
       if obj.length > FP_MAX_STRING
         digest = Digest::MD5.hexdigest(obj)
         middle = "<...#{obj.length} - #{digest[0..4]}...>"
         s = (FP_MAX_STRING - middle.length) / 2
-        "'" << obj.slice(0,s-1) << middle << obj.slice(-s, obj.length )<< "'"
+        "'" + obj.slice(0,s-1) + middle + obj.slice(-s, obj.length ) + "'"
       else 
-        "'" << obj << "'"
+        "'" + obj + "'"
       end
     when ConcurrentStream
       name = obj.inspect + " " + obj.object_id.to_s
@@ -34,22 +34,22 @@ module Log
       "<File:" + obj.path + ">"
     when Array
       if (length = obj.length) > FP_MAX_ARRAY
-        "[#{length}--" <<  (obj.values_at(0,1, length / 2, -2, -1).collect{|e| fingerprint(e)} * ",") << "]"
+        "[#{length}--" + (obj.values_at(0,1, length / 2, -2, -1).collect{|e| fingerprint(e)} * ",") + "]"
       else
-        "[" << (obj.collect{|e| fingerprint(e) } * ", ") << "]"
+        "[" + (obj.collect{|e| fingerprint(e) } * ", ") + "]"
       end
     when Hash
       if obj.length > FP_MAX_HASH
-        "H:{"<< fingerprint(obj.keys) << ";" << fingerprint(obj.values) << "}"
+        "H:{" + fingerprint(obj.keys) + ";" + fingerprint(obj.values) + "}"
       else
         new = "{"
         obj.each do |k,v|
-          new << fingerprint(k) << '=>' << fingerprint(v) << ' '
+          new += fingerprint(k) + '=>' + fingerprint(v) + ' '
         end
         if new.length > 1
            new[-1] =  "}"
         else
-          new << '}'
+          new += '}'
         end
         new
       end
