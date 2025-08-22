@@ -39,6 +39,7 @@ module Persist
     update = options[:update] || persist_options[:update]
     update = Open.mtime(update) if Path === update
     update = Open.mtime(file) >= update ? false : true if Time === update
+    update = Open.mtime(file) >= Time.now - update ? false : true if Numeric === update
 
     if type == :memory
       repo = options[:memory] || options[:repo] || MEMORY_CACHE
