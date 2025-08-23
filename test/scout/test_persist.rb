@@ -71,7 +71,7 @@ class TestPersist < Test::Unit::TestCase
     end
   end
 
-  def test_update_time
+  def test_update_file
     TmpFile.with_file do |dir|
       Path.setup(dir)
       obj = "TEST"
@@ -95,6 +95,15 @@ class TestPersist < Test::Unit::TestCase
     end
   end
 
+  def test_update_time
+    TmpFile.with_file do |dir|
+      assert_equal "TEST1", Persist.persist('Test update time', :string, :dir => tmpdir.persist){ "TEST1" }
+      assert_equal "TEST1", Persist.persist('Test update time', :string, :dir => tmpdir.persist){ "TEST2" }
+      assert_equal "TEST1", Persist.persist('Test update time', :string, :dir => tmpdir.persist, update: 5){ "TEST2" }
+      sleep 5
+      assert_equal "TEST2", Persist.persist('Test update time', :string, :dir => tmpdir.persist, update: 5){ "TEST2" }
+    end
+  end
   def test_concurrent
     num = 10
 
