@@ -13,7 +13,7 @@ class TestHook < Test::Unit::TestCase
       end
     end
 
-    a = 's'
+    a = 's'.dup
     a.extend m
 
     assert_equal 'original', m.test
@@ -32,7 +32,7 @@ class TestHook < Test::Unit::TestCase
     
     Hook.apply(h, m)
 
-    a = 's'
+    a = 's'.dup
     a.extend m
 
     assert_equal 'hook', m.test

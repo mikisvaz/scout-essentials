@@ -88,8 +88,8 @@ module IndiferentHash
   def self.hash2string(hash)
     hash.sort_by{|k,v| k.to_s}.collect{|k,v| 
       next unless %w(Symbol String Float Fixnum Integer Numeric TrueClass FalseClass Module Class Object).include? v.class.to_s
-      [ Symbol === k ? ":" << k.to_s : k.to_s.chomp,
-        Symbol === v ? ":" << v.to_s : v.to_s.chomp] * "="
+      [ Symbol === k ? ":" + k.to_s : k.to_s.chomp,
+        Symbol === v ? ":" + v.to_s : v.to_s.chomp] * "="
     }.compact * "#"
   end
 

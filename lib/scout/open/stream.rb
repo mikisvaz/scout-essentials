@@ -464,15 +464,15 @@ module Open
               if compact
                 current_parts[i] = part.dup
               else
-                current_parts[i] = "|" << part
+                current_parts[i] = "|" + part
               end
             else
-              current_parts[i] = current_parts[i] << "|" << part
+              current_parts[i] = current_parts[i] + "|" << part
             end
           end
 
           (parts.length..current_parts.length-1).to_a.each do |pos|
-            current_parts[pos] = current_parts[pos] << "|" << ""
+            current_parts[pos] = current_parts[pos] + "|" << ""
           end
         when current_key.nil?
           current_key = key

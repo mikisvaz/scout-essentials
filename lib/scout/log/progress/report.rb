@@ -120,18 +120,18 @@ module Log
       str = Log.color(:magenta, "·")
       if @ticks == 0
         if @max
-          return str << " " << Log.color(:magenta, "waiting on #{@max} #{bytes ? 'bytes' : 'items'}") <<  Log.color(:magenta, " · " << desc)
+          return str + " " << Log.color(:magenta, "waiting on #{@max} #{bytes ? 'bytes' : 'items'}") <<  Log.color(:magenta, " · " + desc)
         else
-          return str << " " << Log.color(:magenta, "waiting - PID: #{Process.pid}") <<  Log.color(:magenta, " · " << desc)
+          return str + " " << Log.color(:magenta, "waiting - PID: #{Process.pid}") <<  Log.color(:magenta, " · " + desc)
         end
       end
-      str << " " << thr_msg
+      str += " " + thr_msg
       if max
         str << Log.color(:blue, " -- ") << eta_msg
       else
         str << Log.color(:blue, " -- ") << ticks.to_s << " #{bytes ? 'bytes' : 'items'}"
       end
-      str <<  Log.color(:magenta, " · " << desc)
+      str <<  Log.color(:magenta, " · " + desc)
       str
     end
 
@@ -208,8 +208,8 @@ module Log
       @last_count = 0
       @last_time = @start
       thr = ellapsed > 0 ? (@ticks / ellapsed).to_i.to_s : 0
-      done_msg << " - " << Log.color(:blue, thr) << " per second"
-      done_msg << Log.color(:magenta, " · " << desc)
+      done_msg << " - " + Log.color(:blue, thr) << " per second"
+      done_msg << Log.color(:magenta, " · " + desc)
       print(io, Log.up_lines(@depth) << done_msg << Log.down_lines(@depth)) 
 
       FileUtils.rm file if file and File.exist?(file)

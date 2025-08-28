@@ -161,7 +161,7 @@ module Log
   HIGHLIGHT = "\033[1m"
 
   def self.uncolor(str)
-    "" << Term::ANSIColor.uncolor(str)
+    "" + Term::ANSIColor.uncolor(str)
   end
 
   def self.reset_color

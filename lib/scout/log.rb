@@ -165,7 +165,7 @@ module Log
     end
   end
 
-  LAST = "log"
+  LAST = "log".dup
   def self.logn(message = nil, severity = MEDIUM, &block)
     return if severity < self.severity
     message ||= block.call if block_given?

@@ -7,7 +7,7 @@ module Path
     when self.located? && File.exist?(self)
       "File MD5: #{Misc.digest_file(self)}"
     else
-      '\'' << self << '\''
+      '\'' + self << '\''
     end
   end
 end

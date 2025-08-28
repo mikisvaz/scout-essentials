@@ -116,8 +116,8 @@ module Scout::Config
 
     File.expand_path(file)
 
-    tokens << ("file:" << file)
-    tokens << ("line:" << file << ":" << line.sub(/:in \`.*/,''))
+    tokens << ("file:" + file)
+    tokens << ("line:" + file << ":" << line.sub(/:in \`.*/,''))
 
     entries = CACHE[key.to_s]
     priorities = {}

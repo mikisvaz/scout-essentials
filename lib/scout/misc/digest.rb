@@ -32,7 +32,7 @@ module Misc
           '[' + obj.inject(""){|acc,o| acc.empty? ? Misc.digest_str(o) : acc << ', ' << Misc.digest_str(o) } << ']'
         end
       when Hash
-        '{' + obj.inject(""){|acc,p| s = Misc.digest_str(p.first) << "=" << Misc.digest_str(p.last); acc.empty? ? s : acc << ', ' << s } << '}'
+        '{' + obj.inject(""){|acc,p| s = Misc.digest_str(p.first) + "=" << Misc.digest_str(p.last); acc.empty? ? s : acc << ', ' << s } << '}'
       when Integer
         obj.to_s
       when Float

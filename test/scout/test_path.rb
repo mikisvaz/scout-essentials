@@ -3,14 +3,14 @@ require File.expand_path(__FILE__).sub(%r(.*/test/), '').sub(/test_(.*)\.rb/,'\1
 
 class TestPath < Test::Unit::TestCase
   def test_join
-    path = '/tmp'
+    path = '/tmp'.dup
     path.extend Path
     assert_equal '/tmp/foo', path.join(:foo)
     assert_equal '/tmp/foo/bar', path.join(:bar, :foo)
   end
 
   def test_get
-    path = '/tmp'
+    path = '/tmp'.dup
     path.extend Path
     assert_equal '/tmp/foo', path[:foo]
     assert_equal '/tmp/foo/bar', path.foo[:bar]
@@ -18,7 +18,7 @@ class TestPath < Test::Unit::TestCase
   end
 
   def test_slash
-    path = '/tmp'
+    path = '/tmp'.dup
     path.extend Path
     assert_equal '/tmp/foo', path/:foo
     assert_equal '/tmp/foo/bar', path/:foo/:bar
@@ -27,7 +27,7 @@ class TestPath < Test::Unit::TestCase
   end
 
   def test_setup
-    path = 'tmp'
+    path = 'tmp'.dup
     Path.setup(path)
     assert_equal 'scout', path.pkgdir
     assert path.libdir.end_with?("scout-essentials")

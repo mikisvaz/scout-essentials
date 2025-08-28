@@ -111,12 +111,12 @@ module CMD
       when value.nil? || FalseClass === value
         next
       when TrueClass === value
-        string << "#{option} "
+        string += "#{option} "
       else
         if option.to_s.chars.to_a.last == "="
-          string << "#{option}'#{value}' "
+          string += "#{option}'#{value}' "
         else
-          string << "#{option} '#{value}' "
+          string += "#{option} '#{value}' "
         end
       end
     end
@@ -172,9 +172,9 @@ module CMD
 
     cmd_options = process_cmd_options options
     if cmd =~ /'\{opt\}'/
-      cmd.sub!('\'{opt}\'', cmd_options)
+      cmd = cmd.sub('\'{opt}\'', cmd_options)
     else
-      cmd << " " << cmd_options
+      cmd += " " + cmd_options
     end
 
     in_content = StringIO.new in_content if String === in_content
@@ -262,7 +262,7 @@ module CMD
         err = ""
         err_thread = Thread.new do
           while not serr.eof?
-            err << serr.gets
+            err += serr.gets
           end
           serr.close
         end
