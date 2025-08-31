@@ -288,9 +288,9 @@ module Log
   end
 
   def self.tsv(tsv, example = false)
-    log_puts Log.color :magenta, "TSV log: " << Log.last_caller(caller).gsub('`',"'")
-    log_puts Log.color(:blue, "=> "<< Log.fingerprint(tsv), true)
-    log_puts Log.color(:cyan, "=> " << tsv.summary)
+    log_puts Log.color :magenta, "TSV log: " + Log.last_caller(caller).gsub('`',"'")
+    log_puts Log.color(:blue, "=> " + Log.fingerprint(tsv), true)
+    log_puts Log.color(:cyan, "=> " + tsv.summary)
     if example && ! tsv.empty?
       key = case example
             when TrueClass, :first, "first"
