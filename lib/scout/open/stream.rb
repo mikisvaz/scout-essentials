@@ -204,6 +204,7 @@ module Open
 
   def self.purge_pipes(*save)
     PIPE_MUTEX.synchronize do
+      save = save.flatten
       OPEN_PIPE_IN.each do |pipe|
         next if save.include? pipe
         pipe.close unless pipe.closed?
