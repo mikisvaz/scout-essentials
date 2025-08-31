@@ -399,10 +399,11 @@ module Open
   end
 
   def self.read_stream(stream, size)
-    str = ""
+    str = "".dup
     while str.length < size
       missing = size - str.length
       more = stream.read(missing)
+      raise ClosedStream if more.nil?
       str << more
     end
     str
