@@ -157,5 +157,21 @@ module IndiferentHash
 
     super(*full_list)
   end
+
+  def dig(*keys)
+    current = self
+    while keys.any?
+      first = keys.shift
+      current = current[first]
+      break if current.nil?
+      IndiferentHash.setup(current) if Hash === current
+    end
+    current
+  end
+
+  def self.dig(obj, *keys)
+    IndiferentHash.setup obj
+    obj.dig(*keys)
+  end
 end
 
