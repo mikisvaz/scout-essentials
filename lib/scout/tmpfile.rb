@@ -124,7 +124,7 @@ module TmpFile
 
     filename = filename[0..MAX_FILE_LENGTH] << Misc.digest(filename[MAX_FILE_LENGTH+1..-1]) if filename.length > MAX_FILE_LENGTH + 10
 
-    filename  += ":" << Misc.digest(clean_options) unless clean_options.empty?
+    filename  += ":" + Misc.digest(clean_options) unless clean_options.empty?
 
     persistence_dir[filename]
   end

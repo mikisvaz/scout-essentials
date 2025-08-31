@@ -29,7 +29,7 @@ module Misc
           sample_pos = [1, 2, mid, length-2, length-1]
           "[#{length}:" + obj.values_at(*sample_pos).inject(""){|acc,o| acc.empty? ? Misc.digest_str(o) : acc << ', ' << Misc.digest_str(o) } << ']'
         else
-          '[' + obj.inject(""){|acc,o| acc.empty? ? Misc.digest_str(o) : acc << ', ' << Misc.digest_str(o) } << ']'
+          '[' + obj.inject("".dup){|acc,o| acc.empty? ? Misc.digest_str(o) : acc << ', ' << Misc.digest_str(o) } << ']'
         end
       when Hash
         '{' + obj.inject(""){|acc,p| s = Misc.digest_str(p.first) + "=" << Misc.digest_str(p.last); acc.empty? ? s : acc << ', ' << s } << '}'
