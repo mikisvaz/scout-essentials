@@ -196,7 +196,7 @@ module Open
     begin
       Open.ln(source, target, options)
     rescue
-      Log.debug "Could not make regular link, trying symbolic: #{Misc.fingerprint(source)} -> #{Misc.fingerprint(target)}"
+      Log.debug "Could not make regular link, trying symbolic: #{Log.fingerprint(source)} -> #{Log.fingerprint(target)}"
       Open.ln_s(source, target, options)
     end
     nil
