@@ -56,6 +56,10 @@ module Annotation
         new.remove_instance_variable(:@container)
       end
 
+      if new.instance_variables.include?(:@container_index)
+        new.remove_instance_variable(:@container_index)
+      end
+
       new
     end
 
