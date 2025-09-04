@@ -49,6 +49,8 @@ module Misc
         "true"
       when FalseClass
         "false"
+      when Proc
+        Misc.digest obj.source_location
       else
         obj.inspect
       end
