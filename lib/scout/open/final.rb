@@ -70,6 +70,12 @@ module Open
     notify_write(file)
   end
 
+  def append(file, content, options = {})
+    options = IndiferentHash.setup options
+    options[:mode] = "a"
+    write(file, content, options)
+  end
+
   def self.mv(source, target, options = {})
     target = target.find if Path === target
     source = source.find if Path === source
@@ -81,6 +87,7 @@ module Open
   end
 
   def self.rm(file)
+    file = file.find if Path === file
     FileUtils.rm(file) if File.exist?(file) || Open.broken_link?(file)
   end
 
