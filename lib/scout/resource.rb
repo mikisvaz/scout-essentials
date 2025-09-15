@@ -33,7 +33,21 @@ module Resource
   end
 
   def path_maps
-    @path_maps ||= Path.path_maps
+    @path_maps ||= Path.path_maps.dup
+  end
+
+  def map_order
+    @map_order ||= Path.map_order.dup
+  end
+
+  def prepend_path(name, map)
+    path_maps[name] = map
+    map_order.unshift(name.to_sym)
+  end
+
+  def append_path(name, map)
+    path_maps[name] = map
+    map_order.push(name.to_sym)
   end
 
   def subdir

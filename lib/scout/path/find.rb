@@ -285,7 +285,7 @@ module Path
 
   def find_with_extension(extension, *args)
     found = self.find(*args)
-    return found if found.exists?
+    return found if found.exists? && ! found.directory?
     found_with_extension = self.set_extension(extension).find
     found_with_extension.exists? ? found_with_extension : found
   end

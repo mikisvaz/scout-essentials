@@ -8,6 +8,7 @@ module Persist
     def cache_dir=(cache_dir)
       @cache_dir = Path === cache_dir ? cache_dir : Path.setup(cache_dir)
     end
+
     def cache_dir
       @cache_dir ||= Path.setup("var/cache/persistence")
     end
