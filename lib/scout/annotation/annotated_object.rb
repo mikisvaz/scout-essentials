@@ -4,6 +4,10 @@ module Annotation
       @annotation_types ||= []
     end
 
+    def base_type
+      annotation_types.last
+    end
+
     def annotation_hash
       attr_hash = {}
       @annotations.each do |name|
