@@ -6,7 +6,7 @@ module Path
       caller_dup = caller.dup
       while file = caller_dup.shift
         break unless file =~ /(?:scout|rbbt)\/(?:resource\.rb|workflow\.rb)/ or
-          file =~ /(?:scout|rbbt)\/(?:.*\/)?(path|open|final|tsv|refactor)\.rb/ or
+          file =~ /(?:scout|rbbt)\/(?:.*\/)?(path|open|final|tsv|refactor|hook|parser)\.rb/ or
           file =~ /(?:scout|rbbt)\/(?:.*\/)?path\/(?:find|refactor|util)\.rb/ or
           file =~ /(?:scout|rbbt)\/persist.rb/ or
           file =~ /(?:scout|rbbt)\/(persist|workflow)\// or
@@ -14,6 +14,7 @@ module Path
           file =~ /modules\/rbbt-util/ or
           file =~ /^<internal:/
       end
+
       return nil if file.nil?
       file = file.sub(/\.rb[^\w].*/,'.rb')
     end
@@ -283,10 +284,18 @@ module Path
       .select{|file| file.exist? }.uniq
   end
 
-  def find_with_extension(extension, *args)
+  def find_with_extension(extension, *args, produce: true)
     found = self.find(*args)
-    return found if found.exists? && ! found.directory?
-    found_with_extension = self.set_extension(extension).find
-    found_with_extension.exists? ? found_with_extension : found
+    return found if found.exists?(produce: produce) && ! found.directory?
+    if Array === extension
+      extension.each do |ext|
+        found_with_extension = self.set_extension(ext).find
+        return found_with_extension if found_with_extension.exists?(produce: produce)
+      end
+    else
+      found_with_extension = self.set_extension(extension).find
+      return found_with_extension if found_with_extension.exists?(produce: produce)
+    end
+    return found
   end
 end

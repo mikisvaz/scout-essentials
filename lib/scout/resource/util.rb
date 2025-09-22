@@ -15,6 +15,8 @@ module Resource
     path = File.expand_path(path) if path.start_with?('/')
     path += "/" if File.directory?(path) and not path.end_with?('/')
 
+    self_pkgdir = self.final_pkgdir
+
     choices = []
     map_order.uniq.each do |name|
       pattern = path_maps[name]
@@ -31,7 +33,7 @@ module Resource
           .gsub(/\/{([^}]+)}/,'(?:/(?<\1>[^/]+))?') +
         "(?:/(?<REST>.+))?/?$"
         if m = path.match(regexp) 
-          if ! m.named_captures.include?("PKGDIR") || m["PKGDIR"] == self.pkgdir
+          if ! m.named_captures.include?("PKGDIR") || m["PKGDIR"] == self_pkgdir
 
             unlocated = %w(TOPLEVEL SUBPATH PATH REST).collect{|c| 
               m.named_captures.include?(c) ? m[c] : nil
@@ -40,10 +42,11 @@ module Resource
             if self.subdir && ! self.subdir.empty?
               subdir = self.subdir
               subdir += "/" unless subdir.end_with?("/")
-              unlocated[subdir] = "" 
+              unlocated[subdir] = ""
             end
 
-            choices << self.annotate(unlocated)
+            unlocated = path.annotate(unlocated) if Path === path
+            choices << unlocated
           end
         end
       end
@@ -51,13 +54,18 @@ module Resource
 
     identified = choices.sort_by{|s| s.length }.first
 
-    Path.setup(identified || path, self, nil, path_maps)
+    identified ||= path
+
+    Path.setup(identified, self, nil, path_maps) unless Path === identified
+
+    identified
   end
 
   def self.identify(path)
     resource = path.pkgdir if Path === path
     resource = Resource.default_resource unless Resource === resource
     unlocated = resource.identify path
+    unlocated
   end
 
   def self.relocate(path)

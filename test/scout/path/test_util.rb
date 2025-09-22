@@ -26,5 +26,16 @@ class TestPathUtil < Test::Unit::TestCase
     path = Path.setup("/home/.scout/dir/file")
     assert_equal "/home/.scout/dir/file", path.unset_extension
   end
+
+  def test_newer?
+    TmpFile.with_path do |dir|
+      Open.write dir.f1, 'test1'
+      sleep 0.1
+      Open.write dir.f2, 'test2'
+
+      assert Path.newer? dir.f1.find, dir.f2.find
+      refute Path.newer? dir.f2.find, dir.f1.find
+    end
+  end
 end
 

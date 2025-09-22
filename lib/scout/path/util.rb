@@ -37,6 +37,10 @@ module Path
     File.directory?(self.find)
   end
 
+  def realpath
+    File.realpath(self.find)
+  end
+
   def relative_to(dir)
     Misc.path_relative_to(File.expand_path(dir), self.find)
   end
@@ -73,6 +77,10 @@ module Path
 
       paths
     end
+  end
+
+  def glob_names(...)
+    glob(...).collect{|f| f.basename }
   end
 
   def glob_all(pattern = nil, caller_lib = nil, search_paths = nil)
@@ -140,8 +148,17 @@ module Path
     self.annotate(new_path)
   end
 
+  def newer_files(*files)
+    files.flatten.select do |file|
+      Path.newer?(self, file)
+    end
+  end
 
-  # Is 'file' newer than 'path'? return non-true if path is newer than file
+  def outdated?(...)
+    newer_files(...).any?
+  end
+
+  # Is 'file' newer than 'path'? return false if path is newer than file
   def self.newer?(path, file, by_link = false)
     return true if not Open.exists?(file)
     path = path.find if Path === path
@@ -157,5 +174,11 @@ module Path
     diff = patht - filet
     return diff if diff < 0
     return false
+  end
+
+  def final_pkgdir
+    final_pkgdir = self.pkgdir
+    final_pkgdir = final_pkgdir.pkgdir while final_pkgdir.respond_to?(:pkgdir)
+    final_pkgdir
   end
 end

@@ -74,8 +74,8 @@ module Path
     Open.list(found)
   end
 
-  def exists?
+  def exists?(produce: true)
     return true if Open.exists?(self.find)
-    self.produce
+    self.produce if produce
   end
 end
