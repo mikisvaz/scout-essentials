@@ -1,30 +1,172 @@
 scout-essentials=/$PWD filter="*.rb *.txt *.md *.conf *.yaml" {
  LICENSE.txt
- Rakefile
+ chats=chats filter="*"{
+  review
+  document.rb
+  docs=docs{
+   Analyze Annotation tests
+   Analyze CMD and related tests
+   Analyze CMD tests
+   Analyze log tests
+   Analyze Open tests
+   Analyze Path tests
+   Analyze Persist tests
+   Analyze Resource tests
+   Analyze selected tests 
+   simple_opt, log, open, persist, cmd, tmpfile
+   
+   Analyze SimpleOpt tests
+   Analyze simple_opt tests
+   Analyze tests: simple_opt, log, open, persist, cmd, tmpfile
+   Analyze tmpfile tests
+   Analyze Utilities tests
+   Assemble Annotation docs
+   Assemble CMD docs
+   Assemble CMD docs 
+   update
+   
+   Assemble Open docs
+   Assemble Open docs 
+   update
+   
+   Assemble Path docs
+   Assemble Persist docs
+   Assemble Persist docs 
+   update
+   
+   Assemble Resource docs
+   Assemble Resource docs 
+   update
+   
+   Assemble Top-level README
+   Assemble Top-level README 
+   update
+   
+   Assemble Top-level README draft
+   Assemble Utilities docs
+   Assemble Utilities docs 
+   update
+   
+   Confirm·Explore Utilities dirs
+   Explore Annotation dirs
+   Explore CMD dirs
+   Explore Log dir
+   Explore Log lib dir
+   Explore Log lib dir 
+   refresh
+   
+   Explore Log test dir
+   Explore Log test dir 
+   refresh
+   
+   Explore Open dirs
+   Explore Path dirs
+   Explore Persist dirs
+   Explore Resource dirs
+   Explore Utilities dirs
+   Finalize README step 
+   refresh
+   
+   Finalize README.md into memory key 
+   .md
+    
+   conditional
+   
+   NEXT_STEPS
+   QA Annotation docs
+   QA CMD docs
+   QA Integrated README
+   QA Integrated README 
+   post-update
+   
+   QA Integrated README 
+   post-update
+    
+   refresh
+   
+   QA Open docs
+   QA Path docs
+   QA Persist docs
+   QA Resource docs
+   QA Utilities docs
+   Read Annotation source files
+   Read CMD source files
+   Read CMD source files 
+   refresh
+   
+   Read Log source files
+   Read Log source files 
+   iterate
+   
+   Read Log source files 
+   refresh
+   
+   Read Log source files 
+   use explorer output
+   
+   Read Open source files
+   Read Open stream and lockfile
+   Read Path source files
+   Read Persist serialize and open
+   Read Persist source files
+   Read Resource scout.rb
+   Read Resource source files
+   Read SimpleOpt source files
+   Read TmpFile and IndiferentHash source files
+   Read Utilities source files
+   Run QA Integrator on assembled docs
+   Update CMD docs 
+   assemble
+   
+   Update Open docs 
+   assemble
+   
+   Update Persist docs 
+   assemble
+   
+   Update Resource docs 
+   assemble
+   
+   Update Utilities docs 
+   assemble
+   
+   final=final{
+    annotation.md
+    cmd.md
+    open.md
+    path.md
+    persist.md
+    resource.md
+   }
+  }
+ }
+ doc=doc{
+  Annotation.md
+  CMD.md
+  ConcurrentStream.md
+  IndiferentHash.md
+  Log.md
+  NamedArray.md
+  Open.md
+  Path.md
+  Persist.md
+  Resource.md
+  SimpleOPT.md
+  TmpFile.md
+ }
  lib=lib {
   scout-essentials.rb
   scout=scout{
-   exceptions.rb
    annotation.rb
    annotation=annotation{
-    array.rb
     annotated_object.rb
     annotation_module.rb
+    array.rb
    }
-   misc.rb
-   misc=misc{
-    digest.rb
-    filesystem.rb
-    format.rb
-    helper.rb
-    insist.rb
-    monitor.rb
-    system.rb
-    math.rb
-    hook.rb
-    matching.rb
-   }
-   named_array.rb
+   cmd.rb
+   concurrent_stream.rb
+   config.rb
+   exceptions.rb
    indiferent_hash.rb
    indiferent_hash=indiferent_hash{
     case_insensitive.rb
@@ -36,41 +178,48 @@ scout-essentials=/$PWD filter="*.rb *.txt *.md *.conf *.yaml" {
     color_class.rb
     fingerprint.rb
     progress.rb
+    trap.rb
     progress=progress{
      report.rb
      util.rb
     }
-
-    trap.rb
    }
-   simple_opt.rb
-   simple_opt=simple_opt{
-    accessor.rb
-    doc.rb
-    get.rb
-    parse.rb
-    setup.rb
-   }
-   path.rb
-   path=path{
-    find.rb
-    tmpfile.rb
-    util.rb
+   misc.rb
+   misc=misc{
     digest.rb
+    filesystem.rb
+    format.rb
+    helper.rb
+    hook.rb
+    insist.rb
+    matching.rb
+    math.rb
+    monitor.rb
+    system.rb
    }
-   concurrent_stream.rb
-   cmd.rb
+   named_array.rb
    open.rb
    open=open{
     final.rb
     lock.rb
     remote.rb
     stream.rb
-    util.rb
     sync.rb
-    bgzf.rb
+    util.rb
    }
-   tmpfile.rb
+   path.rb
+   path=path{
+    digest.rb
+    find.rb
+    tmpfile.rb
+    util.rb
+   }
+   persist.rb
+   persist=persist{
+    open.rb
+    path.rb
+    serialize.rb
+   }
    resource.rb
    resource=resource{
     open.rb
@@ -81,12 +230,14 @@ scout-essentials=/$PWD filter="*.rb *.txt *.md *.conf *.yaml" {
     sync.rb
     util.rb
    }
-   config.rb
-   persist.rb
-   persist=persist{
-    open.rb
-    path.rb
-    serialize.rb
+   simple_opt.rb
+   tmpfile.rb
+   simple_opt=simple_opt{
+    accessor.rb
+    doc.rb
+    get.rb
+    parse.rb
+    setup.rb
    }
   }
  }
@@ -94,10 +245,6 @@ scout-essentials=/$PWD filter="*.rb *.txt *.md *.conf *.yaml" {
   test_helper.rb
   scout=scout{
    test_annotation.rb
-   annotation=annotation{
-    test_annotated_object.rb
-    test_array.rb
-    }
    test_cmd.rb
    test_concurrent_stream.rb
    test_config.rb
@@ -110,11 +257,17 @@ scout-essentials=/$PWD filter="*.rb *.txt *.md *.conf *.yaml" {
    test_persist.rb
    test_resource.rb
    test_tmpfile.rb
+   annotation=annotation{
+    test_array.rb
+    }
    misc=misc{
     test_digest.rb
     test_filesystem.rb
     test_helper.rb
+    test_hook.rb
     test_insist.rb
+    test_matching.rb
+    test_math.rb
     test_system.rb
     }
    }
