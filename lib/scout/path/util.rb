@@ -15,6 +15,14 @@ module Path
     return false
   end
 
+  def self.can_read?(string)
+    return true if Open.remote?(string)
+    return false unless Path.is_filename?(string)
+    string = string.find if Path === string
+    return false if File.directory?(string)
+    return true
+  end
+
   def self.sanitize_filename(filename, length = 254)
     if filename.length > length
       if filename =~ /(\..{2,9})$/
