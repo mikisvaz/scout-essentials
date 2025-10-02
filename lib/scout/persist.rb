@@ -35,11 +35,13 @@ module Persist
 
     file = persist_options[:path] || options[:path] || persistence_path(name, options)
     data = persist_options[:data] || options[:data]
+    check = persist_options[:check] || options[:check]
     no_load = persist_options[:no_load] || options[:no_load]
 
     update = options[:update] || persist_options[:update]
     update = Open.mtime(update) if Path === update
 
+    update = true if file.outdated?(check) if Path === file && check
     file_mtime = Open.mtime(file)
     update = file_mtime >= update ? false : true if file_mtime && Time === update
     update = file_mtime >= (Time.now - update) ? false : true if file_mtime && Numeric === update
