@@ -68,6 +68,8 @@ module Path
       sub('{REMOVE}/', '').
       sub('{REMOVE}', '')
 
+    file.sub!(/\/$/,'') if path._subpath.nil?
+
     while true
       file.gsub!(/\{(.+)(?<!\\)\/(.+)(?<!\\)\/(.+)\}/) do |m|
         key, orig, replace = m.split(/(?<!\\)\//).collect{|p| p.gsub('\/','/') }
