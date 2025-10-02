@@ -35,6 +35,8 @@ module SOPT
   end
 
   def self.register(short, long, asterisk, description)
+    long = long.to_s if Symbol === long
+    short = short.to_s if Symbol === short
     short = fix_shortcut(short, long)
     shortcuts[short] = long if short
     inputs << long
