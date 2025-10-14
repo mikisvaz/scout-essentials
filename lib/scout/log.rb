@@ -59,7 +59,7 @@ module Log
                IO.console.winsize.last
              rescue Exception
                begin
-                 res = `tput li`
+                 res = `tput cols`
                  res = nil if res == ""
                  res || ENV["TTY_SIZE"] || 80
                rescue Exception

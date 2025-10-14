@@ -44,7 +44,7 @@ module Misc
     offset ||= 0
 
     i = 0
-    size = size + offset + indent
+    #size = size + offset + indent
     re = /((?:\n\s*\n\s*)|(?:\n\s*(?=\*)))/
       text.split(re).collect do |paragraph|
       i += 1
@@ -74,7 +74,7 @@ module Misc
 
   def self.format_definition_list_item(dt, dd,  indent = nil, size = nil, color: :yellow)
     if size.nil?
-      base_size = MAX_TTY_LINE_WIDTH
+      base_size = Log.tty_size || MAX_TTY_LINE_WIDTH
       base_indent = indent || (base_size / 3)
       size = base_size - base_indent
     end
