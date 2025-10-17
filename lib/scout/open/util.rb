@@ -129,4 +129,35 @@ module Open
     file = file.produce_and_find if Path === file
     Open.read(file).split("\n")
   end
+
+  def self.wait_for(path, timeout: 10)
+    return if Open.exists?(path)
+
+    path = path.find if Path === path
+
+    require 'listen'
+    require 'timeout'
+
+    dir  = File.dirname(path)
+    name = File.basename(path)
+
+    queue = Queue.new
+    listener = Listen.to(dir) do |_modified, added, _removed|
+      queue << :found if added.include?(path)
+    end
+
+    listener.start
+
+    begin
+      Timeout.timeout(timeout) do
+        # This blocks until something is pushed to the queue
+        queue.pop
+      end
+      true
+    rescue Timeout::Error
+      false
+    ensure
+      listener.stop
+    end
+  end
 end
