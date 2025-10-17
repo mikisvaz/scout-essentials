@@ -130,6 +130,7 @@ module CMD
     options    = IndiferentHash.add_defaults options, :stderr => Log::DEBUG
     in_content = options.delete(:in)
     stderr     = options.delete(:stderr)
+    sudo       = options.delete(:sudo)
     post       = options.delete(:post)
     pipe       = options.delete(:pipe)
     log        = options.delete(:log)
@@ -175,6 +176,10 @@ module CMD
       cmd = cmd.sub('\'{opt}\'', cmd_options)
     else
       cmd += " " + cmd_options
+    end
+
+    if sudo
+      cmd = "sudo " + cmd
     end
 
     in_content = StringIO.new in_content if String === in_content
