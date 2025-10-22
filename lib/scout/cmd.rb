@@ -252,9 +252,8 @@ module CMD
 
       sout
     else
-
+      err = ""
       if bar
-        err = ""
         err_thread = Thread.new do
           while not serr.eof?
             line = serr.gets
@@ -264,7 +263,6 @@ module CMD
           serr.close
         end
       elsif log and Integer === stderr
-        err = ""
         err_thread = Thread.new do
           while not serr.eof?
             err += serr.gets
@@ -274,7 +272,6 @@ module CMD
       else
         Open.consume_stream(serr, true)
         err_thread = nil
-        err = ""
       end
 
       ConcurrentStream.setup sout, :pids => pids, :threads => [in_thread, err_thread].compact, :autojoin => autojoin, :no_fail => no_fail
