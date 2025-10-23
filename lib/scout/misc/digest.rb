@@ -65,7 +65,11 @@ module Misc
   def self.file_md5(file)
     file = file.find if Path === file
     file = File.expand_path(file)
-    Digest::MD5.file(file).hexdigest
+    begin
+      Digest::MD5.file(file).hexdigest
+    rescue
+      Digest::MD5.hexdigest(file)
+    end
   end
 
   def self.fast_file_md5(file, sample = 3_000_000)
