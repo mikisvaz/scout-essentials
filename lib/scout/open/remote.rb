@@ -92,7 +92,6 @@ module Open
         open_cache(url, options)
       end
     rescue
-     STDERR.puts $!.backtrace.inspect
      raise OpenURLError, "Error reading remote url: #{ url }.\n#{$!.message}"
     end
   end
