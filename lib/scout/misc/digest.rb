@@ -8,15 +8,7 @@ module Misc
       case obj
       when String
         if Path.is_filename?(obj) && Open.exists?(obj)
-          if File.directory?(obj)
-            if Path === obj
-              "Directory MD5: #{digest_str(obj.glob("*"))}"
-            else
-              "Directory MD5: #{digest_str(Dir.glob(File.join(obj, "*")))}"
-            end
-          else
-            "File MD5: #{Misc.digest_file(obj)}"
-          end
+          Path.setup(obj).digest_str
         else
           obj.dup
         end
