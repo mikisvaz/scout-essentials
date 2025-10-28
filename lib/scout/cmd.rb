@@ -278,9 +278,13 @@ module CMD
 
       begin
         out = StringIO.new sout.read
-        sout.close unless sout.closed?
-
         status = wait_thr.value
+
+        sout.join
+        sout.close unless sout.closed?
+        sout.annotate(out)
+
+        out.exit_status = status.exitstatus
         if status && ! status.success? && ! no_fail
           if !err.empty?
             raise ProcessFailed.new pid, "#{cmd} failed with error status #{status.exitstatus}.\n#{err}"
@@ -290,6 +294,7 @@ module CMD
         else
           Log.log err, stderr if Integer === stderr and log
         end
+        out.std_err = err if save_stderr
         out
       ensure
         post.call if post

@@ -1,3 +1,4 @@
+require 'pathname'
 module Open
   GREP_CMD = begin
                if ENV["GREP_CMD"] 

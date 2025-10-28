@@ -9,7 +9,7 @@ module AbortedStream
 end
 
 module ConcurrentStream
-  attr_accessor :threads, :pids, :callback, :abort_callback, :filename, :joined, :aborted, :autojoin, :lock, :no_fail, :pair, :thread, :stream_exception, :log, :std_err, :next
+  attr_accessor :threads, :pids, :callback, :abort_callback, :filename, :joined, :aborted, :autojoin, :lock, :no_fail, :pair, :thread, :stream_exception, :log, :std_err, :next, :exit_status
 
   def self.setup(stream, options = {}, &block)
     threads, pids, callback, abort_callback, filename, autojoin, lock, no_fail, pair, next_stream = IndiferentHash.process_options options, :threads, :pids, :callback, :abort_callback, :filename, :autojoin, :lock, :no_fail, :pair, :next
@@ -117,6 +117,7 @@ module ConcurrentStream
       @pids.each do |pid|
         begin
           Process.waitpid(pid, Process::WUNTRACED)
+          self.exit_status = $?.exitstatus
           stream_raise_exception ConcurrentStreamProcessFailed.new(pid, "Error in waitpid", self) unless $?.success? or no_fail
         rescue Errno::ECHILD
         end
