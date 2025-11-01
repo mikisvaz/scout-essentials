@@ -35,7 +35,7 @@ module CMD
         if test
           CMD.cmd(test + " ")
         else
-          CMD.cmd("#{cmd} --help")
+          CMD.cmd("bash -c 'command -v #{cmd}'")
         end
       rescue
         if claim
