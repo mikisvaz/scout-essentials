@@ -170,7 +170,7 @@ module Log
   end
 
   def self.color(color, str = nil, reset = false)
-    return str.dup || "" if nocolor
+    return str.to_s.dup if nocolor
 
     if (color == :integer || color == :float) && Numeric === str
       color = if str < 0
