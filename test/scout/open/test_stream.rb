@@ -421,6 +421,49 @@ row2	aaa		ccc
     assert_not_include txt, "bb|"
   end
 
+  def test_line_monitor_stream
+    text=<<-EOF
+row1 A B C
+row2 AA BB CC
+row3 AAA BBB CCC
+    EOF
+
+    TmpFile.with_file text do |file|
+      Open.open(file) do |f|
+        lines = []
+        s = Open.line_monitor_stream f do |line|
+          lines << line.strip
+        end
+
+        res = s.read
+        assert_equal text, res
+        assert_equal text.split("\n"), lines
+      end
+    end
+  end
+
+  def test_line_monitor_stream_exception
+    text=<<-EOF
+row1 A B C
+row2 AA BB CC
+row3 AAA BBB CCC
+    EOF
+
+    TmpFile.with_file text do |file|
+      Open.open(file) do |f|
+        lines = []
+        s = Open.line_monitor_stream f do |line|
+          lines << line.strip
+          raise if line.include?('row3')
+        end
+
+        s.autojoin = true
+        assert_raise do
+          res = s.read
+        end
+      end
+    end
+  end
   #
   #
   #  def test_paste_stream
@@ -684,21 +727,6 @@ row2	aaa		ccc
 #    end
 #  end
 #
-#  def test_open_pipe_error
-#    sout = Misc.open_pipe do |sin|
-#      10.times do |i|
-#        sin.puts "line #{i}"
-#      end
-#      raise
-#    end
-#
-#    TmpFile.with_file do |tmp|
-#      #Misc.consume_stream(sout, false, tmp)
-#      assert_raise do
-#        Open.write(tmp, sout)
-#      end
-#    end
-#  end
 #end
 end
 

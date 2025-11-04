@@ -251,6 +251,7 @@ module ConcurrentStream
         end
         close if done
       end
+      join if autojoin && (closed? || @stream_exception)
     end
   end
 

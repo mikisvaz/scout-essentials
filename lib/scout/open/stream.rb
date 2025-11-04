@@ -362,7 +362,7 @@ module Open
     end
 
     main_pipe.abort_callback = proc do |exception|
-      stream.abort(exception)
+      stream.abort(exception) if ConcurrentStream === stream
       out_pipes[1..-1].each do |sout|
         sout.abort(exception)
       end
@@ -499,5 +499,28 @@ module Open
         sin.puts [current_key, current_parts].flatten * sep
       end unless current_key.nil?
     end
+  end
+
+  def self.line_monitor_stream(stream, &block)
+    monitor, out = tee_stream stream
+    monitor_thread = Thread.new do
+      begin
+        while line = monitor.gets
+          block.call line
+        end
+      rescue
+        monitor.abort $!
+        monitor.close unless monitor.closed?
+        monitor.join if monitor.respond_to?(:join) && ! monitor.aborted?
+        out.raise $! if out.respond_to?(:raise)
+      ensure
+        monitor.close unless monitor.closed?
+        monitor.join if monitor.respond_to?(:join) && ! monitor.aborted?
+      end
+    end
+    monitor_thread.report_on_exception = false
+
+    stream.annotate out if stream.respond_to? :annotate
+    ConcurrentStream.setup out, :threads => monitor_thread
   end
 end
