@@ -141,6 +141,7 @@ module Log
   SEVERITY_COLOR = [reset, cyan, green, magenta, blue, yellow, red] #.collect{|e| "\033[#{e}"}
   CONCEPT_COLORS = IndiferentHash.setup({
     :title => magenta,
+    :subtitle => yellow,
     :body => blue,
     :path => blue,
     :input => cyan,
