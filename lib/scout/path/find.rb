@@ -95,7 +95,6 @@ module Path
       :lib     => '{LIBDIR}/{TOPLEVEL}/{SUBPATH}',
       :scout_essentials_lib => File.join(Path.caller_lib_dir(__FILE__), "{TOPLEVEL}/{SUBPATH}"),
       :tmp     => '/tmp/{PKGDIR}/{TOPLEVEL}/{SUBPATH}',
-      :home     => '{HOME}/{PATH}',
       :default => :user
     })
   end

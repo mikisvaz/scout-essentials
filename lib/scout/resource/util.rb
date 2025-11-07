@@ -56,6 +56,12 @@ module Resource
 
     identified ||= path
 
+    home = ENV['HOME']
+    if home
+      home += home[0..-2] if home.end_with?('/')
+      identified = identified.sub(/^#{home}(\/|$)/, '~\1')
+    end
+
     Path.setup(identified, self, nil, path_maps) unless Path === identified
 
     identified
