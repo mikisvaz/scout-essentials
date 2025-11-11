@@ -11,21 +11,33 @@ Gem::Specification.new do |s|
   s.required_rubygems_version = Gem::Requirement.new(">= 0".freeze) if s.respond_to? :required_rubygems_version=
   s.require_paths = ["lib".freeze]
   s.authors = ["Miguel Vazquez".freeze]
-  s.date = "2025-06-12"
+  s.date = "1980-01-02"
   s.description = "Things a scout can use anywhere".freeze
   s.email = "mikisvaz@gmail.com".freeze
   s.extra_rdoc_files = [
     "LICENSE.txt",
-    "README.rdoc"
+    "README.md"
   ]
   s.files = [
     ".document",
     ".vimproject",
     "Gemfile",
     "LICENSE.txt",
-    "README.rdoc",
+    "README.md",
     "Rakefile",
     "VERSION",
+    "doc/Annotation.md",
+    "doc/CMD.md",
+    "doc/ConcurrentStream.md",
+    "doc/IndiferentHash.md",
+    "doc/Log.md",
+    "doc/NamedArray.md",
+    "doc/Open.md",
+    "doc/Path.md",
+    "doc/Persist.md",
+    "doc/Resource.md",
+    "doc/SimpleOPT.md",
+    "doc/TmpFile.md",
     "lib/scout-essentials.rb",
     "lib/scout/annotation.rb",
     "lib/scout/annotation/annotated_object.rb",
@@ -146,7 +158,7 @@ Gem::Specification.new do |s|
   ]
   s.homepage = "http://github.com/mikisvaz/scout-essentials".freeze
   s.licenses = ["MIT".freeze]
-  s.rubygems_version = "3.6.6".freeze
+  s.rubygems_version = "3.7.0.dev".freeze
   s.summary = "Scout essential tools".freeze
 
   s.specification_version = 4
@@ -159,5 +171,6 @@ Gem::Specification.new do |s|
   s.add_runtime_dependency(%q<term-ansicolor>.freeze, [">= 0".freeze])
   s.add_runtime_dependency(%q<yaml>.freeze, [">= 0".freeze])
   s.add_runtime_dependency(%q<rake>.freeze, [">= 0".freeze])
+  s.add_runtime_dependency(%q<listen>.freeze, [">= 0".freeze])
 end
 
