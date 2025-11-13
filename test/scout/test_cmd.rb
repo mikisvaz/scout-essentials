@@ -29,6 +29,20 @@ class TestCmd < Test::Unit::TestCase
     assert_equal("test2\n", CMD.cmd("cut", "-f" => 2, "-d" => ' ', :in => "test1 test2", :pipe => true).read)
   end
 
+  def test_in_io
+    text =<<-EOF
+line1
+line2
+line3
+line4
+    EOF
+    TmpFile.with_file(text) do |file|
+      io = Open.open(file)
+      ConcurrentStream.setup(io)
+      CMD.cmd('wc -l', in: io)
+    end
+  end
+
   def test_error
     Log.with_severity 6 do
       assert_raise ProcessFailed do CMD.cmd('fake-command') end

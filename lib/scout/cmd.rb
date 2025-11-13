@@ -202,8 +202,11 @@ module CMD
           Thread.current["name"] = "CMD in"
           while c = in_content.read(Open::BLOCK_SIZE)
             sin << c
+            break if in_content.closed?
           end
+
           sin.close  unless sin.closed?
+          sin.join if sin.respond_to? :join
 
           unless dont_close_in
             in_content.close unless in_content.closed?
@@ -232,13 +235,13 @@ module CMD
         err_thread = Thread.new do
           Thread.current["name"] = "Error log: [#{pid}] #{ cmd }"
           begin
-          while line = serr.gets
-            bar.process(line) if bar
-            sout.log = line
-            sout.std_err << line if save_stderr
-            Log.log "STDERR [#{pid}]: " +  line, stderr if log
-          end
-          serr.close
+            while line = serr.gets
+              bar.process(line) if bar
+              sout.log = line
+              sout.std_err << line if save_stderr
+              Log.log "STDERR [#{pid}]: " +  line, stderr if log
+            end
+            serr.close
           rescue
             Log.exception $!
             raise $!
