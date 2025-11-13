@@ -41,7 +41,7 @@ class ConcurrentStreamProcessFailed < ProcessFailed
   attr_accessor :concurrent_stream
   def initialize(pid = Process.pid, msg = nil, concurrent_stream = nil)
     super(pid, msg)
-    @concurrent_stream = concurrent_stream
+    @concurrent_stream = @concurrent_stream.filename if @concurrent_stream.respond_to? :filename
   end
 end
 
