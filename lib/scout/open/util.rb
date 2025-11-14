@@ -161,4 +161,17 @@ module Open
       listener.stop
     end
   end
+
+  def self.find(path)
+    path = path.path if Step === path
+    path = path.find if Path === path
+
+    if Open.remote?(path)
+      path
+    elsif Open.exists?(path)
+      self.realpath(path)
+    else
+      File.expand_path(path)
+    end
+  end
 end
