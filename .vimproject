@@ -171,6 +171,7 @@ scout-essentials=/$PWD filter="*.rb *.txt *.md *.conf *.yaml" {
    indiferent_hash=indiferent_hash{
     case_insensitive.rb
     options.rb
+    serialize.rb
    }
    log.rb
    log=log{

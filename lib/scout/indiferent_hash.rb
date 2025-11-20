@@ -1,5 +1,6 @@
 require_relative 'indiferent_hash/options'
 require_relative 'indiferent_hash/case_insensitive'
+require_relative 'indiferent_hash/serialize'
 
 module IndiferentHash
 
