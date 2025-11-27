@@ -5,7 +5,7 @@ require_relative 'path/digest'
 
 module Path
   extend Annotation
-  annotation :pkgdir, :libdir, :path_maps, :map_order
+  annotation :pkgdir, :libdir, :path_maps, :map_order, :where, :original
 
   def self.default_pkgdir
     @@default_pkgdir ||= 'scout'

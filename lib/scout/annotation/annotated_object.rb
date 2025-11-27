@@ -64,6 +64,11 @@ module Annotation
         new.remove_instance_variable(:@container_index)
       end
 
+      new.instance_variables.each do |var|
+        value = new.instance_variable_get(var)
+        new.instance_variable_set(var, Annotation.purge(value))
+      end
+
       new
     end
 

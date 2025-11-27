@@ -203,7 +203,7 @@ module Path
   def annotate_found_where(found, where)
     self.annotate(found).tap{|p| 
       p.instance_variable_set("@where", where) 
-      p.instance_variable_set("@original", self.dup) 
+      p.instance_variable_set("@original", self.annotate(self.dup))
     }
   end
 
