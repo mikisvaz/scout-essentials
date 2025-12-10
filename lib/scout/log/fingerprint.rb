@@ -67,6 +67,8 @@ module Log
       else
         obj.inspect
       end
+    when Set
+      fingerprint(obj.to_a)
     else
       obj.to_s
     end
