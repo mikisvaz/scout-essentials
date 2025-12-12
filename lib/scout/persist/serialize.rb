@@ -129,7 +129,7 @@ module Persist
     type = MEMORY if type == :memory
     return unless Hash === type || Open.exist?(file) 
 
-    Log.debug "Load #{Log.fingerprint type} on #{file}"
+    Log.debug "Load #{Log.fingerprint type} from #{file}"
     if load_drivers[type]
       return load_drivers[type].call(file)
     end
