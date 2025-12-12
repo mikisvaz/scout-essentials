@@ -51,7 +51,7 @@ module Persist
       if update
         repo[file] = yield
       else
-        repo[file] ||= yield
+        repo[file] = yield unless repo.include? file
       end
       return repo[file]
     end
