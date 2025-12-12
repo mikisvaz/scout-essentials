@@ -144,8 +144,11 @@ module Open
     file = file.find if Path === file
     begin
       if File.symlink?(file) || File.stat(file).nlink > 1
-        if File.exist?(file + '.info') && defined?(Step)
-          done = Persist.load(file + '.info', Step::SERIALIZER)[:done]
+        info_file = file + '.info'
+        if File.exist?(info_file) && defined?(Step)
+          done = Persist.memory([info_file, File.mtime(info_file)], persist: true ) do
+            Persist.load(info_file, Step::SERIALIZER)[:done]
+          end
           return done if done
         end
 
