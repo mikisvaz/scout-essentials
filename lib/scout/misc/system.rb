@@ -48,17 +48,7 @@ module Misc
     end
   end
 
-  def self.with_env(var, value, &block)
-    old_value = ENV[var]
-    begin
-      ENV[var] = value
-      yield
-    ensure
-      ENV[var] = old_value
-    end
-  end
-
-  def self.with_envs(hash, &block)
+  def self.with_env_hash(hash, &block)
     old_value = {}
     begin
       hash.each do |var,value|
@@ -71,6 +61,24 @@ module Misc
         ENV[var] = value
       end
     end
+  end
+
+  def self.with_env(var, value = nil, &block)
+    if Hash === value
+      with_env_hash(var, &block)
+    else
+      old_value = ENV[var]
+      begin
+        ENV[var] = value
+        yield
+      ensure
+        ENV[var] = old_value
+      end
+    end
+  end
+
+  class << self
+    alias with_envs with_env_hash
   end
 
 
