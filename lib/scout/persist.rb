@@ -42,9 +42,11 @@ module Persist
     update = Open.mtime(update) if Path === update
 
     update = true if file.outdated?(check) if Path === file && check
-    file_mtime = Open.mtime(file)
-    update = file_mtime >= update ? false : true if file_mtime && Time === update
-    update = file_mtime >= (Time.now - update) ? false : true if file_mtime && Numeric === update
+    if update
+      file_mtime = Open.mtime(file)
+      update = file_mtime >= update ? false : true if file_mtime && Time === update
+      update = file_mtime >= (Time.now - update) ? false : true if file_mtime && Numeric === update
+    end
 
     if type == :memory
       repo = options[:memory] || options[:repo] || MEMORY_CACHE
