@@ -37,5 +37,26 @@ class TestPathUtil < Test::Unit::TestCase
       refute Path.newer? dir.f2.find, dir.f1.find
     end
   end
+
+  def test_can_read
+    TmpFile.with_path do |dir|
+      Open.write dir.f1, 'test1'
+      sleep 0.1
+      Open.write dir.f2, 'test2'
+      Open.write dir.f4, 'test4'
+
+      CMD.cmd("chmod -w #{dir.f4.find}")
+
+      assert Path.can_read? dir.f1
+      assert Path.can_read? dir.f3
+      assert Path.can_write? dir.f3
+
+      refute Path.can_write? dir.f4
+
+      CMD.cmd("chmod -w #{dir.find}")
+      refute Path.can_write? dir.f3
+      CMD.cmd("chmod +w #{dir.find}")
+    end
+  end
 end
 

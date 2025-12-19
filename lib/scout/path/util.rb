@@ -23,6 +23,15 @@ module Path
     return true
   end
 
+  def self.can_write?(string)
+    return false if Open.remote?(string)
+    return false unless Path.is_filename?(string)
+    string = string.find if Path === string
+    return false if File.directory?(string)
+    return File.writable?(string) if File.exist?(string)
+    return File.writable?(File.dirname(string))
+  end
+
   def self.sanitize_filename(filename, length = 254)
     if filename.length > length
       if filename =~ /(\..{2,9})$/
