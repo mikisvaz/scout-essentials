@@ -80,6 +80,9 @@ module Misc
   def self.digest_file(file)
     file = file.find if Path === file
     file = File.expand_path(file)
+    if Open.exist? file + '.md5'
+      return Open.read(file + '.md5').strip
+    end
     if File.size(file) > 10_000_000
       fast_file_md5(file)
     else
