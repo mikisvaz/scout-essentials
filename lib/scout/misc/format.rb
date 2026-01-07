@@ -36,7 +36,7 @@ module Misc
     end
   end
 
-  MAX_TTY_LINE_WIDTH = 160
+  MAX_TTY_LINE_WIDTH = 120
   def self.format_paragraph(text, size = nil, indent = nil, offset = nil)
     size ||= Log.tty_size || MAX_TTY_LINE_WIDTH
     size = MAX_TTY_LINE_WIDTH if size > MAX_TTY_LINE_WIDTH
@@ -45,8 +45,8 @@ module Misc
 
     i = 0
     #size = size + offset + indent
-    re = /((?:\n\s*\n\s*)|(?:\n\s*(?=\*)))/
-      text.split(re).collect do |paragraph|
+    re = /((?:\n\s*\n\s*)|(?:\n\s*(?=\*))|(?:\n\s\s+)|(?:\n\s*[-\*]))/
+    text.split(re).collect do |paragraph|
       i += 1
       str = if i % 2 == 1
               words = paragraph.gsub(/\s+/, "\s").split(" ")
@@ -75,11 +75,12 @@ module Misc
   def self.format_definition_list_item(dt, dd,  indent = nil, size = nil, color: :yellow)
     if size.nil?
       base_size = Log.tty_size || MAX_TTY_LINE_WIDTH
+      base_size = MAX_TTY_LINE_WIDTH if base_size > MAX_TTY_LINE_WIDTH
       base_indent = indent || (base_size / 3)
       size = base_size - base_indent
     end
 
-    indent ||= base_indent || size / 3
+    indent ||= base_indent || (size / 3)
 
     dd = "" if dd.nil?
     dt = Log.color color, dt if color
@@ -87,12 +88,12 @@ module Misc
     len = Log.uncolor(dt).length
 
     if indent < 0
-      text = format_paragraph(dd, size, indent.abs-1, 0)
+      text = format_paragraph(dd, base_size, indent.abs-1, 0)
       text = dt << "\n" << text
     else
       offset = len - indent
       offset = 0 if offset < 0
-      text = format_paragraph(dd, size, indent.abs+1, offset)
+      text = format_paragraph(dd, base_size, indent.abs+1, offset)
       text[0..len-1] = dt
     end
     text
