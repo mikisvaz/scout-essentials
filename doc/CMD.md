@@ -32,11 +32,71 @@ puts stream.read   # streaming consumption
 stream.join        # wait for producers and check exit status
 ```
 
+## Common gotchas
+
+These are the most common sources of confusion when using `CMD.cmd`:
+
+- **String vs Symbol as the first argument**:
+  - `CMD.cmd('mytool ...')` runs exactly that shell command.
+  - `CMD.cmd(:mytool, ...)` goes through `CMD.get_tool(:mytool)` first (tool registry / bootstrap). This is useful when you want
+tool discovery/installation behavior.
+  - If you do *not* rely on the tool registry, prefer passing the command as a String.
+
+- **Pipe mode needs a `join` (for correct error detection)**:
+  - With `:pipe => true`, you typically do `io = CMD.cmd(..., pipe: true)` and then `io.read`.
+  - To reliably detect failures (non-zero exit), call `io.join` (unless you deliberately set `no_fail: true`).
+
+- **Non-pipe mode returns a `StringIO`**:
+  - With `:pipe => false` (default), CMD collects stdout and returns a `StringIO` *after* the process completes.
+  - This is convenient, but can be memory-heavy for large outputs.
+
+- **`save_stderr` vs logging**:
+  - `log: true` (default in many contexts) logs stderr lines as they arrive.
+  - `save_stderr: true` additionally accumulates stderr into `io.std_err` (useful for raising helpful exceptions).
+
+- **`no_fail` suppresses exceptions**:
+  - If you pass `no_fail: true`, CMD will not raise `ProcessFailed` / `ConcurrentStreamProcessFailed` on non-zero exits.
+  - This is useful for "try it" probes, but make sure you explicitly check `io.exit_status` (or parse output) when you need correctness.
+
+- **`{opt}` placeholder**:
+  - If the command string contains the exact substring `'{opt}'`, CMD replaces it with the processed options string.
+  - Otherwise, options are appended to the end of the command.
+
+- **Second argument ambiguity**:
+  - `CMD.cmd(tool, {...})` means the second argument is treated as options and `cmd_fragment_or_options` becomes nil.
+  - If you intended to pass a command fragment, pass it as a String, e.g. `CMD.cmd('cut', "-f 2", in: "a b")`.
+
 ---
 
 ## Important options
 
 All options are passed as an options Hash (converted with IndiferentHash), and many are special keys:
+
+### Understanding `CMD.cmd` arguments
+
+`CMD.cmd` has a flexible signature:
+
+- `CMD.cmd(tool_or_cmd, cmd_fragment_or_options = nil, options = {})`
+
+Common calling styles:
+
+```ruby
+# 1) Single string command
+io = CMD.cmd("echo hello")
+
+# 2) Tool + command fragment
+io = CMD.cmd("cut", "-f 2 -d ' '", in: "a b")
+
+# 3) Tool + options hash (options are converted to CLI flags)
+io = CMD.cmd("cut", {"-f" => 2, "-d" => " "}, in: "a b")
+
+# 4) Tool registry symbol (uses CMD.get_tool first)
+io = CMD.cmd(:python, "--version")
+```
+
+Notes:
+- If the *second* argument is a Hash, it is treated as option flags and `cmd_fragment_or_options` becomes nil.
+- Options are shell-quoted; values containing single quotes are escaped.
 
 - :pipe (boolean) — if true, return a stream you can read from; otherwise CMD returns a StringIO after the process completes.
 - :in — input to feed to the command:
@@ -177,6 +237,39 @@ CMD.cmd('grep . NONEXISTINGFILE', :pipe => true).join
 
 ## Recommendations & patterns
 
+### Robust error-handling pattern
+
+A common robust pattern is:
+
+```ruby
+io = CMD.cmd("SomeTool", "--flag value", log: true, save_stderr: true, no_fail: true)
+
+# Decide how to handle failure
+if io.exit_status != 0
+  raise ScoutException, io.read + "
+" + io.std_err.to_s
+end
+```
+
+- `no_fail: true` prevents immediate exceptions (useful so you can include stderr in your own error message).
+- If you want CMD to raise automatically, omit `no_fail` and rely on `ProcessFailed` / `ConcurrentStreamProcessFailed`.
+
+### Large outputs
+
+- Prefer `:pipe => true` when you want to stream and transform output without buffering everything in memory.
+- If you need to keep the full output, write it to a file as you consume it, and return/keep only a small summary in memory.
+
+### Pipelines
+
+When composing multiple commands, use pipe mode and pass the upstream stream as `:in`:
+
+```ruby
+io1 = CMD.cmd("tool1", "--emit", pipe: true)
+io2 = CMD.cmd("tool2", "--filter", in: io1, pipe: true)
+out = io2.read
+io2.join
+```
+
 - Prefer `:pipe => true` + ConcurrentStream when you want streaming processing without waiting for full output in memory.
 - Provide `:in` as an IO to stream large inputs into a subprocess.
 - Use `:autojoin => true` to automatically join producers on EOF/close (useful for simple consumers).
@@ -201,3 +294,70 @@ CMD.cmd('grep . NONEXISTINGFILE', :pipe => true).join
 ---
 
 CMD centralizes robust process execution patterns needed throughout the framework: streaming, joining, logging, error detection and tool bootstrap. Use its options to control behavior for production-grade command invocation.
+
+---
+
+## Designing command wrappers for workflows and agents
+
+When you wrap external CLI tools inside workflow tasks (or expose them to agents), use a pattern that maximizes reproducibility and keeps outputs small for downstream consumers:
+
+- Backend task (tool runner)
+  - Run the binary, write all full outputs to `step.files_dir` (use `file('name')` helpers).
+  - Return a compact JSON summary with:
+    - `files`: list of important output file paths (full paths inside `.files/`).
+    - `params`: what parameters were used (seeds, time, sample_count, fixed clamps, etc.).
+    - optional small parsed snippets (e.g. final probabilities) if tiny.
+  - Use `CMD.cmd('Binary', ...)` (string) unless the tool is registered; include `save_stderr: true` so errors are captured.
+
+- Analysis task (summary)
+  - `dep` on the backend task and parse only the necessary outputs into a compact summary suitable for the interactive/LLM context (JSON, small tables, phenotype probs).
+  - Echo the backend `params` in the returned result so cached runs are auditable.
+
+Benefits:
+- Clear cache boundaries: the backend is the expensive, cacheable step; the analysis is cheap and reproducible given the backend outputs.
+- Agents never have to load entire trace files; they get a compact summary.
+
+
+## Quick checklist when using CMD in workflows
+
+- Prefer `CMD.cmd('Binary', ...)` string invocation unless you intentionally want the tool registry/install behavior via symbol form.
+- For long-running streaming tasks use `:pipe => true` and **always** `join` the returned stream (or rely on `autojoin`) to detect failures.
+- If you must ignore process failures for probing, use `no_fail: true` but explicitly check exit code or outputs later.
+- Use `save_stderr: true` when you will raise on error: include `io.std_err` in exception messages.
+- Avoid returning raw `StringIO` of huge outputs from tasks — write to `step.files_dir` instead and return a small summary.
+
+
+## Minimal patterns/examples
+
+Read-only capture (small output):
+```ruby
+out = CMD.cmd("echo hello").read   # synchronous, small stdout
+```
+
+Streaming safe consumption:
+```ruby
+stream = CMD.cmd("tail -f /some/log", pipe: true)
+begin
+  data = stream.read
+ensure
+  stream.join   # ensure you detect non-zero exit and collect stderr
+end
+```
+
+Pass an IO to stdin safely:
+```ruby
+f = Open.open('input.txt')
+io = CMD.cmd('someprog', :in => f, pipe: true)
+puts io.read
+io.join
+```
+
+Tool registry vs direct call:
+```ruby
+# use tool registry (only if the tool is registered in CMD.tool)
+CMD.cmd(:my_registered_tool, '--version')
+# prefer direct call when portability is desired
+CMD.cmd('my_tool --version')
+```
+
+For more advanced patterns and examples see the `CMD` implementation and tests in the codebase.
