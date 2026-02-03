@@ -16,6 +16,7 @@ module Log
     when Symbol
       ":" + obj.to_s
     when String
+      obj = obj.gsub("\n", '\n')
       if obj.length > FP_MAX_STRING
         digest = Digest::MD5.hexdigest(obj)
         middle = "<...#{obj.length} - #{digest[0..4]}...>"
