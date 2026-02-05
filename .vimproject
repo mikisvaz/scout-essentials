@@ -1,6 +1,7 @@
 scout-essentials=/$PWD filter="*.rb *.txt *.md *.conf *.yaml" {
  LICENSE.txt
  chats=chats filter="*"{
+  improve_doc
   intro
 
   review
