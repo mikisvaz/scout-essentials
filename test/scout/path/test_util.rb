@@ -58,5 +58,14 @@ class TestPathUtil < Test::Unit::TestCase
       CMD.cmd("chmod +w #{dir.find}")
     end
   end
+
+  def test_find_exists
+    TmpFile.with_path do |dir|
+      Open.write dir.f1.set_extension("rb"), 'test1'
+
+      assert dir.f1.find_with_extension("rb").exists?
+      refute dir.f1.find_with_extension("rp").exists?
+    end
+  end
 end
 

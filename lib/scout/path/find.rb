@@ -288,15 +288,15 @@ module Path
 
   def find_with_extension(extension, *args, produce: true)
     found = self.find(*args)
-    return found if found.exists?(produce: produce) && ! found.directory?
+    return found if found.exists? && ! found.directory?
     if Array === extension
       extension.each do |ext|
         found_with_extension = self.set_extension(ext).find
-        return found_with_extension if found_with_extension.exists?(produce: produce)
+        return found_with_extension if found_with_extension.exists?
       end
     else
       found_with_extension = self.set_extension(extension).find
-      return found_with_extension if found_with_extension.exists?(produce: produce)
+      return found_with_extension if found_with_extension.exists?
     end
     return found
   end

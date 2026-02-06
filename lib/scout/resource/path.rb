@@ -76,6 +76,26 @@ module Path
 
   def exists?(produce: true)
     return true if Open.exists?(self.find)
-    self.produce if produce
+    if produce
+      self.produce
+      Open.exists?(self.find)
+    else
+      false
+    end
+  end
+
+  def find_with_extension(extension, *args, produce: true)
+    found = self.find(*args)
+    return found if found.exists?(produce: produce) && ! found.directory?
+    if Array === extension
+      extension.each do |ext|
+        found_with_extension = self.set_extension(ext).find
+        return found_with_extension if found_with_extension.exists?(produce: produce)
+      end
+    else
+      found_with_extension = self.set_extension(extension).find
+      return found_with_extension if found_with_extension.exists?(produce: produce)
+    end
+    return found
   end
 end
