@@ -41,4 +41,10 @@ module Hook
       end
     end
   end
+
+  def self.hook_method(base_class, source_class, method_name)
+    base_class.define_singleton_method(method_name) do |*args, &block|
+      source_class.send(method_name, *args, &block)
+    end
+  end
 end
