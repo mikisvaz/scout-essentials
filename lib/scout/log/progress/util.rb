@@ -90,7 +90,7 @@ module Log
         yield bar
       rescue KeepBar
         keep = true
-      rescue
+      rescue Exception
         error = true
         raise $!
       ensure
