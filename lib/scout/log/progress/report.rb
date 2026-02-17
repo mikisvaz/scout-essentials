@@ -89,7 +89,7 @@ module Log
       percent = self.percent
       time = Time.now
 
-      indicator = ""
+      indicator = "".dup
       10.times{|i|
         if i < percent / 10 then
           indicator << Log.color(:yellow, ".")
