@@ -45,7 +45,7 @@ module Misc
 
     i = 0
     #size = size + offset + indent
-    re = /((?:\n\s*\n\s*)|(?:\n\s*(?=\*))|(?:\n\s\s+)|(?:\n\s*[-\*]))/
+    re = /((?:\n\s*\n\s*)|(?:\n\s*(?=\*))|(?:\n```)|(?:\n\s*[-\*])|(?:\n\s\s+))/
     text.split(re).collect do |paragraph|
       i += 1
       str = if i % 2 == 1
