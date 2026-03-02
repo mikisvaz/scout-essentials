@@ -61,7 +61,7 @@ module ScoutRake
       end
       Kernel.exit! 0
     }
-    Process.waitpid(pid)
+    Misc.wait_child(pid)
     raise "Rake failed" unless $?.success?
 
   end
