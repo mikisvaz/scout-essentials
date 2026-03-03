@@ -212,8 +212,10 @@ module CMD
             in_content.close unless in_content.closed?
             in_content.join if in_content.respond_to? :join
           end
-        rescue
+        rescue Exception
           Log.error "Error in CMD  [#{pid}] #{cmd}: #{$!.message}" unless no_fail
+          sin.close  unless sin.closed?
+          sin.join if sin.respond_to? :join
           raise $!
         end
       end

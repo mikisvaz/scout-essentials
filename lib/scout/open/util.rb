@@ -36,7 +36,8 @@ module Open
   end
    
   def self.gunzip(stream)
-    CMD.cmd('zcat', :in => stream, :pipe => true, :no_fail => true, :no_wait => true)
+    #CMD.cmd('zcat', :in => stream, :pipe => true, :no_fail => true, :no_wait => true)
+    CMD.cmd('zcat', :in => stream, :pipe => true, :no_fail => false, :no_wait => true)
   end
 
   def self.gzip(stream)

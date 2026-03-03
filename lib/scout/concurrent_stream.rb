@@ -222,7 +222,7 @@ module ConcurrentStream
     if autojoin
       begin
         super(*args)
-      rescue
+      rescue Exception
         self.abort
         self.join
         stream_raise_exception $!

@@ -21,5 +21,15 @@ class TestOpenRemote < Test::Unit::TestCase
       end
     end if false
   end
+
+  def test_error
+    teardown
+    sss 0
+    assert_raises ConcurrentStreamProcessFailed do
+      stream = Open.open("ftp://ftp.ncbi.nlm.nih.gov/pub/geo/DATA/SOFT/GDS/GDS3148.soft.gz", nocache: true)
+      stream.read
+    end
+  end
+
 end
 
