@@ -56,6 +56,7 @@ module ScoutRake
           Rake::FileTask.clear_files
         end
       rescue Exception
+        Log.exception $!
         Log.error "Error in rake: #{$!.message}"
         Kernel.exit! -1
       end

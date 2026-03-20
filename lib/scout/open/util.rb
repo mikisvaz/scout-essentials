@@ -35,22 +35,25 @@ module Open
     Bgzf.setup stream
   end
    
-  def self.gunzip(stream)
-    #CMD.cmd('zcat', :in => stream, :pipe => true, :no_fail => true, :no_wait => true)
-    CMD.cmd('zcat', :in => stream, :pipe => true, :no_fail => false, :no_wait => true)
+  def self.gunzip(stream, options = {})
+    options = IndiferentHash.add_defaults options, :pipe => true, :no_fail => false, :no_wait => true, in: stream
+    CMD.cmd('zcat', options)
   end
 
-  def self.gzip(stream)
-    CMD.cmd('gzip', :in => stream, :pipe => true, :no_fail => true, :no_wait => true)
+  def self.gzip(stream, options = {})
+    options = IndiferentHash.add_defaults options, :pipe => true, :no_fail => false, :no_wait => true, in: stream
+    CMD.cmd('gzip', options)
   end
 
-  def self.bgzip(stream)
-    CMD.cmd('bgzip', :in => stream, :pipe => true, :no_fail => true, :no_wait => true)
+  def self.bgzip(stream, options = {})
+    options = IndiferentHash.add_defaults options, :pipe => true, :no_fail => false, :no_wait => true, in: stream
+    CMD.cmd('bgzip', options)
   end
 
-  def self.unzip(stream)
+  def self.unzip(stream, options = {})
+    options = IndiferentHash.add_defaults options, :pipe => true, :no_fail => false, :no_wait => true, in: stream
     TmpFile.with_file(stream.read) do |filename|
-      StringIO.new(CMD.cmd("unzip '{opt}' #{filename}", "-p" => true, :pipe => true).read)
+      StringIO.new(CMD.cmd("unzip '{opt}' #{filename}", options))
     end
   end
 
