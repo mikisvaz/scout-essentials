@@ -125,7 +125,15 @@ module Resource
                 raise "Unkown object produced: #{Log.fingerprint data}"
               end
             when :rake
-              run_rake(path, content, rake_dir)
+              begin
+                run_rake(path, content, rake_dir)
+              rescue
+                if $!.message.include?("Don't know how to build task")
+                  raise ResourceNotFound, "Resource is missing and does not seem to be claimed: #{ self } -- #{ path } "
+                else
+                  raise $!
+                end
+              end
             when :install
               software_dir = self.root.software
               name = File.basename(path)
