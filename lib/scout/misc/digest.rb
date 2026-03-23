@@ -7,11 +7,12 @@ module Misc
     else
       case obj
       when String
-        if Path.is_filename?(obj) && Open.exists?(obj)
-          Path.setup(obj).digest_str
-        else
-          obj.dup
-        end
+          if Path.is_filename?(obj) && Open.exists?(obj)
+            @@digest_str_cache ||= {}
+            @@digest_str_cache[obj] ||= Path.setup(obj).digest_str
+          else
+            obj.dup
+          end
       when Integer, Symbol
         obj.to_s
       when Array
