@@ -73,6 +73,10 @@ module Open
     !! (file =~ /\.zip$/)
   end
 
+  def self.compressed?(file)
+    Open.zip?(file) || Open.gzip?(file) || Open.bgzip?(file)
+  end
+
   def self.is_stream?(obj)
     IO === obj || StringIO === obj
   end
