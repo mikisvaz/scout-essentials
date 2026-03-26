@@ -85,6 +85,7 @@ module Path
   def self.path_maps
     @@path_maps ||= IndiferentHash.setup({
       :current => "{PWD}/{TOPLEVEL}/{SUBPATH}",
+      :home    => "{HOME}/{TOPLEVEL}/{PKGDIR}/{SUBPATH}",
       :user    => "{HOME}/.{PKGDIR}/{TOPLEVEL}/{SUBPATH}",
       :global  => '/{TOPLEVEL}/{PKGDIR}/{SUBPATH}',
       :usr     => '/usr/{TOPLEVEL}/{PKGDIR}/{SUBPATH}',
@@ -100,7 +101,7 @@ module Path
   end
 
   def self.basic_map_order
-    @@basic_map_order ||= %w(current workflow user local global usr lib fast cache bulk).collect{|m| m.to_sym }
+    @@basic_map_order ||= %w(current workflow user home local global usr lib fast cache bulk).collect{|m| m.to_sym }
   end
 
   def self.map_order
