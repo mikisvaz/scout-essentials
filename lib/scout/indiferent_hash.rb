@@ -137,7 +137,7 @@ module IndiferentHash
     new
   end
 
-  def prety_print
+  def pretty_print
     Misc.format_definition_list(self, sep: "\n")
   end
 

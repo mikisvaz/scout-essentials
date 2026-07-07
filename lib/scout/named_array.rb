@@ -159,7 +159,7 @@ module NamedArray
     end
   end
 
-  def prety_print
+  def pretty_print
     Misc.format_definition_list(self.to_hash, sep: "\n")
   end
 end
