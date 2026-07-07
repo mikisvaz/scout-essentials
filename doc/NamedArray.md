@@ -49,7 +49,7 @@ a.to_hash  # => IndiferentHash { a: 1, b: 2 }
   - Returns a hash mapping fields => value for each field position. The returned hash is extended with IndiferentHash (so both string and symbol lookups work).
   - Example: a.to_hash[:a] => 1
 
-- prety_print
+- pretty_print
   - Convenience pretty-print wrapper: uses Misc.format_definition_list(self.to_hash, sep: "\n").
 
 - method_missing(name, *args)

@@ -85,8 +85,8 @@ Methods and behaviors:
   - keys_to_sym! converts string keys in-place to symbols (best-effort; rescue on any failed conversion).
   - keys_to_sym returns a new IndiferentHash with keys converted to symbols.
 
-- prety_print
-  - A convenience wrapper that calls Misc.format_definition_list(self, sep: "\n") (keeps existing behavior/name `prety_print` as in code).
+- pretty_print
+  - A convenience wrapper that calls Misc.format_definition_list(self, sep: "\n")
 
 - except(*list)
   - Returns a hash copy excluding provided keys. Accepts symbol/string forms; returns a result consistent with Hash#except but extended to be indifferent.
@@ -235,6 +235,5 @@ prefixed = IndiferentHash.pull_keys(h, :foo)
 - The [] lookup has special handling with Hash defaults: if the hash has a default or default_proc
   and the requested key is not present in keys, it will return the default without trying the alternate symbol/string form.
 - CaseInsensitiveHash is independent of IndiferentHash; you can mix both if needed, but their behaviors are separate.
-- Some helper names are spelled as in the codebase (e.g., prety_print), used for compatibility.
 
 This module covers common patterns required for flexible option handling in the framework: indifferent access, easy merging and defaulting, parsing/printing option strings, and extracting prefixed option subsets.
