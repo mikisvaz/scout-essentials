@@ -359,7 +359,10 @@ def ppp(message)
   stack = caller
   puts "#{Log.color :cyan, "PRINT:"} " << stack.first
   puts ""
-  message = message.pretty_print if message.respond_to?(:pretty_print)
+  begin
+    message = message.pretty_print if message.respond_to?(:pretty_print)
+  rescue
+  end
   if message.length > 200 or message.include? "\n"
     puts Log.color(:cyan, "=>|") << "\n" << message.to_s
   else
