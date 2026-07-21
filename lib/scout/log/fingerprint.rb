@@ -3,6 +3,18 @@ module Log
   FP_MAX_STRING = 150
   FP_MAX_ARRAY = 20
   FP_MAX_HASH = 10
+
+  def self.truncate_string(string, max=FP_MAX_STRING)
+    if string.length > max
+      digest = Digest::MD5.hexdigest(string)
+      middle = "<...#{string.length} - #{digest[0..4]}...>"
+      s = (max - middle.length) / 2
+      string.slice(0,s-1) + middle + string.slice(-s, string.length )
+    else 
+      string
+    end
+  end
+
   def self.fingerprint(obj)
     return obj.fingerprint if obj.respond_to?(:fingerprint)
 
@@ -17,14 +29,7 @@ module Log
       ":" + obj.to_s
     when String
       obj = obj.gsub("\n", '\n')
-      if obj.length > FP_MAX_STRING
-        digest = Digest::MD5.hexdigest(obj)
-        middle = "<...#{obj.length} - #{digest[0..4]}...>"
-        s = (FP_MAX_STRING - middle.length) / 2
-        "'" + obj.slice(0,s-1) + middle + obj.slice(-s, obj.length ) + "'"
-      else 
-        "'" + obj + "'"
-      end
+      "'" + Log.truncate_string(obj) + "'"
     when ConcurrentStream
       name = obj.inspect + " " + obj.object_id.to_s
       name += " #{obj.filename}" if obj.filename
