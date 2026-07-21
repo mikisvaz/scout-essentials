@@ -21,7 +21,7 @@ module Path
     file
   end
 
-  def self.caller_lib_dir(file = nil, relative_to = ['lib', 'bin'])
+  def self.caller_lib_dir(file = nil, relative_to = ['lib', 'bin', 'README.md'])
 
     file = caller_file(file)
 
