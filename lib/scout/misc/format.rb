@@ -212,6 +212,30 @@ module Misc
     end
   end
 
+  def self.human_number(n)
+    units = ["", "K", "M", "B", "T"]
+
+    sign = n < 0 ? "-" : ""
+    value = n.abs.to_f
+    unit = 0
+
+    while value >= 999.5 && unit < units.size - 1
+      value /= 1000.0
+      unit += 1
+    end
+
+    str =
+      if value >= 100
+        value.round.to_s
+      elsif value >= 10
+        value.round.to_s
+      else
+        ("%.1f" % value).sub(/\.0$/, "")
+      end
+
+    "#{sign}#{str}#{units[unit]}"
+  end
+
   def self.parse_sql_values(txt)
     io = StringIO.new txt.strip
 
