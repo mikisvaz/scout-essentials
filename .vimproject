@@ -6,20 +6,30 @@ scout-essentials=/$PWD filter="*.rb *.txt *.md *.conf *.yaml" {
 
   review
   document.rb
+  documentation
  }
  doc=doc{
-  Annotation.md
-  CMD.md
-  ConcurrentStream.md
-  IndiferentHash.md
-  Log.md
-  NamedArray.md
-  Open.md
-  Path.md
-  Persist.md
-  Resource.md
-  SimpleOPT.md
-  TmpFile.md
+  Improvements.md
+  StartHere.md
+  user=user{
+   AnnotatingData.md
+   CachingResults.md
+   CommandLineOptions.md
+   Cookbook.md
+   HandlingStreams.md
+   LoggingAndProgress.md
+   ProducingResources.md
+   RunningCommands.md
+   WorkingWithFiles.md
+  }
+  developer=developer{
+   AnnotationSystem.md
+   Architecture.md
+   DesignPrinciples.md
+   PathResolution.md
+   PersistenceAndResources.md
+   StreamingModel.md
+  }
  }
  lib=lib {
   scout-essentials.rb
