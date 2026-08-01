@@ -124,6 +124,36 @@ module CMD
     string.strip
   end
 
+  # ScoutCoder: process_cmd_options_array mirrors process_cmd_options but
+  # returns an array of separate argument strings instead of a single shell
+  # string, suitable for the no-shell array form of Open3.popen3
+  def self.process_cmd_options_array(options = {})
+    add_dashes = IndiferentHash.process_options options, :add_option_dashes
+
+    result = []
+    options.each do |option, value|
+      raise "Invalid option key: #{option.inspect}" if option.to_s !~ /^[a-z_0-9\-=.]+$/i
+
+      option = "--" << option.to_s if add_dashes and option.to_s[0] != '-'
+
+      case
+      when value.nil? || FalseClass === value
+        next
+      when TrueClass === value
+        result << option.to_s
+      else
+        if option.to_s.chars.to_a.last == "="
+          result << "#{option}#{value}"
+        else
+          result << option.to_s
+          result << value.to_s
+        end
+      end
+    end
+
+    result
+  end
+
   def self.cmd(tool, cmd = nil, options = {}, &block)
     options, cmd = cmd, nil if Hash === cmd
 
@@ -147,45 +177,74 @@ module CMD
 
     log = true if log.nil?
 
-    if cmd.nil? && ! Symbol === tool
-      cmd = tool
-    else
-      tool = get_tool(tool)
-      if cmd.nil?
-        cmd = tool
-      else
-        cmd = tool + ' ' + cmd
+    array_mode = Array === tool
+
+    if array_mode
+      cmd_array = tool.dup
+      cmd_array << cmd if cmd.is_a?(String) && !cmd.empty?
+
+      case xvfb
+      when TrueClass
+        cmd_array = ["xvfb-run", "--server-args=-screen 0 1024x768x24", "--auto-servernum"] + cmd_array
+      when String
+        cmd_array = ["xvfb-run", "--server-args=#{xvfb}", "--auto-servernum", "--server-num=1"] + cmd_array
       end
 
-    end
+      if stderr == true
+        stderr = Log::HIGH
+      end
 
-    case xvfb
-    when TrueClass
-      cmd = "xvfb-run --server-args='-screen 0 1024x768x24' --auto-servernum #{cmd}"
-    when String
-      cmd = "xvfb-run --server-args='#{xvfb}' --auto-servernum --server-num=1 #{cmd}"
-    when String
-    end
+      cmd_array += process_cmd_options_array options
 
-    if stderr == true
-      stderr = Log::HIGH
-    end
+      cmd_array = ["sudo"] + cmd_array if sudo
 
-    cmd_options = process_cmd_options options
-    if cmd =~ /'\{opt\}'/
-      cmd = cmd.sub('\'{opt}\'', cmd_options)
+      # Build cmd string for logging/error messages
+      cmd = cmd_array.map { |e| e.to_s.include?(' ') ? "'#{e}'" : e.to_s }.join(' ')
     else
-      cmd += " " + cmd_options
-    end
+      if cmd.nil? && ! Symbol === tool
+        cmd = tool
+      else
+        tool = get_tool(tool)
+        if cmd.nil?
+          cmd = tool
+        else
+          cmd = tool + ' ' + cmd
+        end
 
-    if sudo
-      cmd = "sudo " + cmd
+      end
+
+      case xvfb
+      when TrueClass
+        cmd = "xvfb-run --server-args='-screen 0 1024x768x24' --auto-servernum #{cmd}"
+      when String
+        cmd = "xvfb-run --server-args='#{xvfb}' --auto-servernum --server-num=1 #{cmd}"
+      when String
+      end
+
+      if stderr == true
+        stderr = Log::HIGH
+      end
+
+      cmd_options = process_cmd_options options
+      if cmd =~ /'\{opt\}'/
+        cmd = cmd.sub('\'{opt}\'', cmd_options)
+      else
+        cmd += " " + cmd_options
+      end
+
+      if sudo
+        cmd = "sudo " + cmd
+      end
     end
 
     in_content = StringIO.new in_content if String === in_content
 
     sin, sout, serr, wait_thr = begin
-                                  Open3.popen3(ENV, cmd)
+                                  if array_mode
+                                    Open3.popen3(ENV, *cmd_array)
+                                  else
+                                    Open3.popen3(ENV, cmd)
+                                  end
                                 rescue
                                   Log.warn $!.message
                                   raise ProcessFailed, nil, cmd unless no_fail

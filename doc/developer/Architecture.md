@@ -97,6 +97,34 @@ Open.open(file) { |io| ... }       # close after block
 Persist.persist(...) { ... }       # lock + write after block
 ```
 
+### Command execution: String and Array forms
+
+CMD.cmd accepts the command in two forms that share the same lifecycle,
+streaming, and error-handling code path but differ in how the command
+reaches the operating system:
+
+**String form** (`CMD.cmd("echo hello")`): the command is treated as a
+shell command. Options from the hash are interpolated via the `{opt}`
+placeholder or appended, using `process_cmd_options` to build the option
+string. The tool registry is consulted when a Symbol is passed. The final
+string is handed to `Open3.popen3(ENV, cmd)`, which spawns a shell.
+
+**Array form** (`CMD.cmd(["echo", "hello"])`): the command is executed
+directly — no shell is spawned. Options from the hash are converted to
+separate argument strings by `process_cmd_options_array` (the array
+counterpart of `process_cmd_options`) and appended to the command array.
+The tool registry is not consulted. The array is passed to
+`Open3.popen3(ENV, *cmd_array)`, which calls `execve` directly.
+
+The branch is selected by checking `Array === tool` at the top of
+`CMD.cmd`. After this branch, both forms converge: the same IO-handling
+code feeds stdin, wraps output in ConcurrentStream, logs stderr, checks
+exit status, and raises `ProcessFailed` on failure. For logging and error
+messages, the array form builds a human-readable string by quoting elements
+that contain spaces.
+
+See [Running Commands](../user/RunningCommands.md) for usage guidance.
+
 ## Data flow
 
 ### File resolution and reading

@@ -130,6 +130,13 @@ ConcurrentStream.setup(io, threads: [], pids: [])
 
 - **CMD** — CMD wraps every pipe output with ConcurrentStream. The producer
   thread and PID are registered on the stream.
+  CMD can launch the process either via a shell (String form) or directly
+  (Array form). In both cases the resulting stdout is a ConcurrentStream
+  carrying the producer PID and threads; the only difference is whether
+  `Open3.popen3` receives a shell string or a splatted argument array. The
+  Array form avoids spawning a shell, which is important for security when
+  arguments come from untrusted input, but does not affect the stream
+  lifecycle described in this document.
 - **Open** — Open's streaming functions (e.g., for remote files) may use
   ConcurrentStream for async fetching.
 - **Persist** — Persist's atomic writes don't use ConcurrentStream, but

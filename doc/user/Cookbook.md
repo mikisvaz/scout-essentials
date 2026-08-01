@@ -278,6 +278,28 @@ end
 
 ---
 
+## Running a command safely with variable arguments
+
+When command arguments come from user input, filenames, or other variable
+sources, use the Array form to avoid shell injection. Each element becomes
+a single argument, and special characters are treated as literal data:
+
+```ruby
+# User-provided filename and search pattern — safe with Array form
+filename = params[:file]       # e.g. "my data; rm -rf /"
+pattern  = params[:pattern]    # e.g. "test | cat"
+
+output = CMD.cmd(["grep", pattern, filename]).read
+# The shell would have interpreted ; and | — the Array form does not.
+```
+
+If you need shell features (pipes, redirects, globbing, variable
+expansion), use the String form instead. See [Running
+Commands](RunningCommands.md) for guidance on choosing between the two
+forms.
+
+---
+
 ## See also
 
 Each recipe builds on the concepts explained in the individual user guides:

@@ -7,6 +7,8 @@ scout-essentials=/$PWD filter="*.rb *.txt *.md *.conf *.yaml" {
   review
   document.rb
   documentation
+
+  cmd
  }
  doc=doc{
   Improvements.md
