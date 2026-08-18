@@ -164,6 +164,7 @@ module ConcurrentStream
 
     threads = @threads.dup
     @threads.clear
+    aborted_threads = []
     threads.each do |t|
       next if t == Thread.current
       next if t["aborted"]
@@ -171,7 +172,11 @@ module ConcurrentStream
       exception = exception.nil? ? Aborted.new : exception
       Log.debug "Aborting thread #{Log.fingerprint(t)} with exception: #{exception}"
       t.raise(exception)
-      t.join
+      aborted_threads << t
+    end
+
+    aborted_threads.each do |t|
+      t.join unless t.alive?
     end
   end
 
