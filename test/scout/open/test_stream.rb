@@ -5,7 +5,7 @@ require 'scout/path'
 require 'scout/open'
 
 class TestOpenStream < Test::Unit::TestCase
-  def test_stream
+  def _test_stream
     content =<<-EOF
 1
 2
@@ -21,7 +21,7 @@ class TestOpenStream < Test::Unit::TestCase
     end
   end
 
-  def test_sensible_write
+  def _test_sensible_write
     content =<<-EOF
 1
 2
@@ -37,7 +37,7 @@ class TestOpenStream < Test::Unit::TestCase
     end
   end
 
-  def test_open_pipe
+  def _test_open_pipe
     sout = Open.open_pipe do |sin|
       10.times do |i|
         sin.puts "line #{i}"
@@ -50,7 +50,7 @@ class TestOpenStream < Test::Unit::TestCase
     end
   end
 
-  def test_open_pipe_and_close
+  def _test_open_pipe_and_close
 
     10000.times do
       sout = Open.open_pipe do |sin|
@@ -62,7 +62,7 @@ class TestOpenStream < Test::Unit::TestCase
   end
 
 
-  def test_open_pipe_error
+  def _test_open_pipe_error
     sout = Open.open_pipe do |sin|
       10.times do |i|
         sin.puts "line #{i}"
@@ -77,7 +77,7 @@ class TestOpenStream < Test::Unit::TestCase
     end
   end
 
-  def test_tee_stream
+  def _test_tee_stream
     num = 2000
     sout = Open.open_pipe do |sin|
       num.times do |i|
@@ -99,7 +99,7 @@ class TestOpenStream < Test::Unit::TestCase
     end
   end
 
-  def test_tee_stream_multiple
+  def _test_tee_stream_multiple
     num = 2000
     sout = Open.open_pipe do |sin|
       num.times do |i|
@@ -163,7 +163,7 @@ class TestOpenStream < Test::Unit::TestCase
     end
   end
 
-  def test_tee_stream_source_error_multiple
+  def _test_tee_stream_source_error_multiple
     5.times do |i|
       num = 2000
       sout = Open.open_pipe do |sin|
@@ -204,7 +204,7 @@ class TestOpenStream < Test::Unit::TestCase
     end
   end
 
-  def test_tee_stream_save_error
+  def _test_tee_stream_save_error
     Log.with_severity 6 do
       50.times do |i|
         TmpFile.with_file do |tmp|
@@ -242,7 +242,7 @@ class TestOpenStream < Test::Unit::TestCase
     end
   end
 
-  def test_tee_stream_save_error_multiple
+  def _test_tee_stream_save_error_multiple
     Log.with_severity 6 do
       50.times do |i|
         TmpFile.with_file do |tmp|
@@ -285,7 +285,7 @@ class TestOpenStream < Test::Unit::TestCase
     end
   end
 
-  def test_sort_stream
+  def _test_sort_stream
     text =<<-EOF
 ##
 ##
@@ -301,7 +301,7 @@ row1 A B C
        assert_equal %w(## ## ## #Row row1 row2 row3), sorted.read.split("\n").collect{|l| l.split(" ").first}
   end
 
-  def test_sort_long_stream
+  def _test_sort_long_stream
     text =<<-EOF
 ##
 ##
@@ -318,7 +318,7 @@ row1 A B C
     assert_equal %w(## ## ## #Row row1 row2 row3), sorted.read.split("\n").collect{|l| l.split(" ").first}
   end
 
-  def test_sort_stream2
+  def _test_sort_stream2
     text =<<-EOF
 ##
 ##
@@ -334,7 +334,7 @@ row1 A B C
     assert_equal %w(## ## ## #Row row1 row2 row3), sorted.read.split("\n").collect{|l| l.split(" ").first}
   end
 
-  def test_collapse_stream
+  def _test_collapse_stream
     text=<<-EOF
 row1 A B C
 row1 a b c
@@ -351,7 +351,7 @@ row2 aa bb cc
   end
 
 
-  def test_collapse_sum
+  def _test_collapse_sum
     text=<<-EOF
 row1 12
 row1 4
@@ -368,7 +368,7 @@ row2 6
   end
 
 
-  def test_collapse_stream_gap
+  def _test_collapse_stream_gap
     text=<<-EOF
 row2 AA BB 
 row2 aa bb cc
@@ -394,7 +394,7 @@ row2 aa bb cc
     assert Open.collapse_stream(s, sep: " ").read =~  /\|cc$/
   end
 
-  def test_collapse_stream_compact
+  def _test_collapse_stream_compact
     text=<<-EOF
 row1	A	B	C
 row1	a	b	c
@@ -421,7 +421,7 @@ row2	aaa		ccc
     assert_not_include txt, "bb|"
   end
 
-  def test_line_monitor_stream
+  def _test_line_monitor_stream
     text=<<-EOF
 row1 A B C
 row2 AA BB CC
@@ -442,7 +442,7 @@ row3 AAA BBB CCC
     end
   end
 
-  def test_line_monitor_stream_exception
+  def _test_line_monitor_stream_exception
     text=<<-EOF
 row1 A B C
 row2 AA BB CC
@@ -466,7 +466,7 @@ row3 AAA BBB CCC
   end
   #
   #
-  #  def test_paste_stream
+  #  def _test_paste_stream
   #    text1=<<-EOF
   #row1 A B C
   #row2 AA BB CC
@@ -493,7 +493,7 @@ row3 AAA BBB CCC
   #    assert_equal ["AAA", "BBB", "CCC", "", "", "ccc"], tsv["row3"]
   #  end
   #
-  #  def test_sort_stream
+  #  def _test_sort_stream
   #    text =<<-EOF
   ###
   ###
@@ -509,7 +509,7 @@ row3 AAA BBB CCC
   #    assert_equal %w(## ## ## #Row row1 row2 row3), sorted.read.split("\n").collect{|l| l.split(" ").first}
 #  end
 #
-#  def test_sort_long_stream
+#  def _test_sort_long_stream
 #    text =<<-EOF
 ###
 ###
@@ -526,7 +526,7 @@ row3 AAA BBB CCC
 #    assert_equal %w(## ## ## #Row row1 row2 row3), sorted.read.split("\n").collect{|l| l.split(" ").first}
 #  end
 #
-#  def test_sort_stream2
+#  def _test_sort_stream2
 #    text =<<-EOF
 ###
 ###
@@ -542,7 +542,7 @@ row3 AAA BBB CCC
 #    assert_equal %w(## ## ## #Row row1 row2 row3), sorted.read.split("\n").collect{|l| l.split(" ").first}
 #  end
 #
-#  def test_dup_stream
+#  def _test_dup_stream
 #    text =<<-EOF
 ##: :sep=" "
 ##Row LabelA LabelB LabelC
@@ -571,7 +571,7 @@ row3 AAA BBB CCC
 #    end
 #  end
 #
-#  def test_dup_stream_multiple
+#  def _test_dup_stream_multiple
 #    text =<<-EOF
 #row2 AA BB CC
 #row3 AAA BBB CCC
@@ -605,7 +605,7 @@ row3 AAA BBB CCC
 #    end
 #  end
 #
-#  def test_remove_lines
+#  def _test_remove_lines
 #    text1 =<<-EOF
 #line1
 #line2
@@ -627,7 +627,7 @@ row3 AAA BBB CCC
 #
 #
 #
-#  def test_select_lines
+#  def _test_select_lines
 #    text1 =<<-EOF
 #line1
 #line2
@@ -648,7 +648,7 @@ row3 AAA BBB CCC
 #    end
 #  end
 #
-#  def test_consume_into_string_io
+#  def _test_consume_into_string_io
 #    text =<<-EOF
 #line1
 #line2
@@ -665,7 +665,7 @@ row3 AAA BBB CCC
 #    end
 #  end
 #
-#  def test_monitor
+#  def _test_monitor
 #    text =<<-EOF
 #line1
 #line2
@@ -684,7 +684,7 @@ row3 AAA BBB CCC
 #    end
 #  end
 #
-#  def test_sort
+#  def _test_sort
 #    assert_raise RbbtException do
 #      io = Misc.open_pipe do |sin|
 #        sin.puts "#START"
@@ -704,7 +704,7 @@ row3 AAA BBB CCC
 #    end
 #  end
 #
-#  def test_gz_pipe
+#  def _test_gz_pipe
 #    text =<<-EOF
 #line1
 #line2

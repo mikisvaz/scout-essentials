@@ -175,4 +175,126 @@ line33
       assert_nothing_raised ProcessFailed do CMD.cmd(["fake-command"], :no_fail => true) end
     end
   end
+
+  ### :timeout option
+
+  def test_cmd_timeout_nonpipe_raises
+    Log.with_severity 6 do
+      e = assert_raise(CMD::Timeout) do
+        CMD.cmd("sleep 5", :timeout => 0.3)
+      end
+      assert_match(/sleep 5/, e.message)
+      assert_match(/0\.3/, e.message)
+      assert_match(/sleep 5/, e.command)
+      assert_equal(0.3, e.timeout)
+    end
+  end
+
+  def test_cmd_timeout_nonpipe_no_zombie
+    Log.with_severity 6 do
+      e = assert_raise(CMD::Timeout) do
+        CMD.cmd("sleep 30", :timeout => 0.3)
+      end
+      pid = e.pid
+
+      # The pid is reaped by the watchdog: once reaped, waitpid raises
+      # Errno::ECHILD.  Retry for a while to allow for the kill grace period
+      reaped = false
+      40.times do
+        begin
+          Process.waitpid(pid, Process::WNOHANG)
+          sleep 0.05
+        rescue Errno::ECHILD
+          reaped = true
+          break
+        end
+      end
+      assert(reaped, "pid #{pid} was not reaped after the timeout")
+    end
+  end
+
+  def test_cmd_timeout_nonpipe_completes
+    # A command that finishes before the timeout works as if no timeout was
+    # given, and the option does not leak into the command line
+    assert_equal("test\n", CMD.cmd("echo test", :timeout => 5).read)
+  end
+
+  def test_cmd_timeout_pipe_read_raises
+    Log.with_severity 6 do
+      assert_raise(CMD::Timeout) do
+        CMD.cmd("sleep 5", :pipe => true, :timeout => 0.3).read
+      end
+    end
+  end
+
+  def test_cmd_timeout_pipe_join_raises
+    Log.with_severity 6 do
+      io = CMD.cmd("sleep 5", :pipe => true, :timeout => 0.3)
+      assert_raise(CMD::Timeout){ io.join }
+    end
+  end
+
+  def test_cmd_timeout_pipe_partial_output
+    Log.with_severity 6 do
+      io = CMD.cmd("bash -c 'echo START; sleep 5'", :pipe => true, :timeout => 0.5)
+      line = nil
+      begin
+        line = io.gets
+      rescue IOError
+        # closing the stream may interrupt the read first
+      end
+      assert_equal("START\n", line)
+      assert_raise(CMD::Timeout){ io.join }
+    end
+  end
+
+  def test_cmd_timeout_pipe_completes
+    io = CMD.cmd("echo test", :pipe => true, :timeout => 5)
+    assert_equal("test\n", io.read)
+    assert_nothing_raised{ io.join }
+  end
+
+  def test_cmd_timeout_pipe_stderr_thread
+    # Exercises the stderr consumer thread cleanup on timeout
+    Log.with_severity 6 do
+      assert_raise(CMD::Timeout) do
+        CMD.cmd("bash -c 'echo OUT; echo ERR >&2; sleep 5'", :pipe => true, :timeout => 0.3, :stderr => 0).read
+      end
+    end
+  end
+
+  def test_cmd_timeout_pipe_blocked_input
+    # The stdin feeder thread blocks writing to the process; it must be
+    # interrupted when the timeout aborts the stream
+    Log.with_severity 6 do
+      content = "line\n" * 100_000
+      assert_raise(CMD::Timeout) do
+        CMD.cmd("bash -c 'read line; sleep 5'", :in => content, :pipe => true, :timeout => 0.5).read
+      end
+    end
+  end
+
+  def test_cmd_timeout_is_process_failed
+    Log.with_severity 6 do
+      caught = nil
+      begin
+        CMD.cmd("sleep 5", :timeout => 0.3)
+      rescue ProcessFailed
+        caught = $!
+      end
+      assert(CMD::Timeout === caught)
+    end
+  end
+
+  def test_cmd_failure_without_timeout_is_not_timeout
+    Log.with_severity 6 do
+      e = assert_raise(ProcessFailed){ CMD.cmd("false") }
+      assert(! (CMD::Timeout === e))
+    end
+  end
+
+  def test_cmd_no_timeout_option_long_command
+    # Without :timeout the behaviour is unchanged: the caller waits
+    assert_equal("done\n", CMD.cmd("bash -c 'sleep 0.2; echo done'").read)
+  end
 end

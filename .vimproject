@@ -9,6 +9,8 @@ scout-essentials=/$PWD filter="*.rb *.txt *.md *.conf *.yaml" {
   documentation
 
   cmd
+
+  timeout
  }
  doc=doc{
   Improvements.md
