@@ -176,7 +176,7 @@ module ConcurrentStream
     end
 
     aborted_threads.each do |t|
-      t.join unless t.alive?
+      t.join
     end
   end
 
@@ -247,6 +247,7 @@ module ConcurrentStream
       super(*args)
     rescue Exception
       @stream_exception ||= $!
+      self.abort
       raise @stream_exception
     ensure
       if ! @stream_exception && autojoin && ! closed?

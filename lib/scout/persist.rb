@@ -118,16 +118,20 @@ module Persist
             pres = Persist.save(res, file, type)
             res = pres unless pres.nil?
           end
-        rescue Exception
-          Thread.handle_interrupt(Exception => :never) do
-            if Open.exist?(file)
-              Log.debug "Failed persistence #{file} - erasing"
-              Open.rm_rf file
-            else
-              Log.debug "Failed persistence #{file}"
-            end
-          end unless DontPersist === $!
-          raise $! unless options[:canfail]
+        rescue Exception => e
+          begin
+            Thread.handle_interrupt(Exception => :never) do
+              if Open.exist?(file)
+                Log.debug "Failed persistence #{file} - erasing"
+                Open.rm_rf file
+              else
+                Log.debug "Failed persistence #{file}"
+              end
+            end unless DontPersist === e
+          rescue
+          ensure
+            raise e unless options[:canfail]
+          end
         end
         
         if TrueClass === no_load

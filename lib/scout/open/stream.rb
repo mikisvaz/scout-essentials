@@ -121,8 +121,8 @@ module Open
           when (IO === content or StringIO === content or File === content)
             Open.write(tmp_path) do |f|
               while block = content.read(BLOCK_SIZE)
-                f.write block
-                break if content.closed?
+                f.write block if block
+                break if content.closed? || content.eof?
               end
             end
           else
