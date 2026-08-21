@@ -5,6 +5,7 @@ require_relative 'exceptions'
 require_relative 'open/stream'
 require 'stringio'
 require 'open3'
+require 'fileutils'
 
 module CMD
 
@@ -190,6 +191,30 @@ module CMD
     xvfb       = options.delete(:xvfb)
     bar        = options.delete(:progress_bar)
     save_stderr = options.delete(:save_stderr)
+
+    # :save_stderr also accepts a file path (String, Scout Path or Pathname)
+    # or an IO-like object (anything that responds to :write).  A path is
+    # opened here for writing (truncating, creating missing parent
+    # directories) and CMD owns it: it is closed when the command ends.  An
+    # IO-like object is used as-is and never closed by CMD.  In addition to
+    # writing the destination, std_err keeps accumulating (String and Path are
+    # truthy, so the existing `if save_stderr` behaviour covers this)
+    save_stderr_dst = nil
+    save_stderr_close = false
+    if save_stderr && ! (TrueClass === save_stderr || FalseClass === save_stderr)
+      if String === save_stderr || Pathname === save_stderr
+        path = save_stderr
+        path = path.find if Path === path
+        path = path.to_s unless String === path
+        dir = File.dirname(path)
+        FileUtils.mkdir_p dir unless File.exist?(dir)
+        save_stderr_dst = File.open(path, 'w')
+        save_stderr_close = true
+      elsif save_stderr.respond_to?(:write) || save_stderr.respond_to?(:<<)
+        save_stderr_dst = save_stderr
+      end
+    end
+
     autojoin   = options.delete(:autojoin)
     autojoin   = no_wait if autojoin.nil?
     timeout    = options.delete(:timeout)
@@ -268,6 +293,9 @@ module CMD
                                   end
                                 rescue
                                   Log.warn $!.message
+                                  # The command never started; do not leak the
+                                  # file opened for it above
+                                  save_stderr_dst.close if save_stderr_dst && save_stderr_close
                                   raise ProcessFailed, nil, cmd unless no_fail
                                   return
                                 end
@@ -419,7 +447,7 @@ module CMD
 
       sout.callback = post if post
 
-      if (Integer === stderr and log) || bar
+      if (Integer === stderr and log) || bar || save_stderr_dst
         err_thread = Thread.new do
           Thread.current["name"] = "Error log: [#{pid}] #{ cmd }"
           Thread.current.report_on_exception = false
@@ -428,18 +456,36 @@ module CMD
               bar.process(line) if bar
               sout.log = line
               sout.std_err << line if save_stderr
+              # Write each line to the destination as soon as it arrives and
+              # flush, so that a `tail -f` on the file follows the progress
+              # of the command while the pipe is still being consumed
+              if save_stderr_dst
+                save_stderr_dst << line
+                save_stderr_dst.flush if save_stderr_dst.respond_to?(:flush)
+              end
               Log.log "STDERR [#{pid}]: " +  line, stderr if log
             end
             serr.close
           rescue Aborted
             # The stream was aborted (e.g. by a :timeout): stop silently, the
-            # consumer of sout gets the real exception from the stream
+            # consumer of sout gets the real exception from the stream.  The
+            # destination is flushed and closed, whatever was written so far
+            # is kept in place (the log file is not removed)
             serr.close unless serr.closed?
           rescue
             # When the stream is being aborted (e.g. by a :timeout) the
             # consumer gets the real exception from the stream itself
             Log.exception $! unless sout.aborted?
             raise $!
+          ensure
+            # No fd leak: CMD closes what it opened (a caller provided IO is
+            # only flushed, closing is up to the caller)
+            begin
+              save_stderr_dst.flush if save_stderr_dst && save_stderr_dst.respond_to?(:flush) && ! save_stderr_dst.closed?
+            rescue Exception
+              Log.exception $!
+            end
+            save_stderr_dst.close if save_stderr_dst && save_stderr_close && ! save_stderr_dst.closed?
           end
         end
       else
@@ -458,7 +504,7 @@ module CMD
             while not serr.eof?
               line = serr.gets
               bar.process(line)
-              err << line if Integer === stderr and log
+              err << line if save_stderr || (Integer === stderr and log)
             end
             serr.close
           rescue Exception
@@ -468,6 +514,20 @@ module CMD
           end
         end
       elsif log and Integer === stderr
+        err_thread = Thread.new do
+          Thread.current.report_on_exception = false
+          begin
+            while not serr.eof?
+              err += serr.gets
+            end
+            serr.close
+          rescue Exception
+            serr.close unless serr.closed?
+          end
+        end
+      elsif save_stderr_dst
+        # Without log level and bar stderr would be discarded; accumulate it
+        # so the destination never ends up silently empty
         err_thread = Thread.new do
           Thread.current.report_on_exception = false
           begin
@@ -505,6 +565,20 @@ module CMD
         sout.annotate(out)
 
         out.exit_status = status.exitstatus
+
+        # Save stderr before reporting a failure: the ProcessFailed message
+        # embeds it and the destination must keep it, even when the command
+        # fails (sout.join above already filled err completely)
+        out.std_err = err if save_stderr
+        if save_stderr_dst
+          begin
+            save_stderr_dst << err unless err.empty?
+            save_stderr_dst.flush if save_stderr_dst.respond_to?(:flush) && ! save_stderr_dst.closed?
+          rescue Exception
+            Log.exception $!
+          end
+        end
+
         if status && ! status.success? && ! no_fail
           if !err.empty?
             raise ProcessFailed.new pid, "#{cmd} failed with error status #{status.exitstatus}.\n#{err}"
@@ -514,7 +588,6 @@ module CMD
         else
           Log.log err, stderr if Integer === stderr and log
         end
-        out.std_err = err if save_stderr
         out
       rescue Timeout
         # Abort the internal stream so pipes are closed, the input and error
@@ -522,6 +595,16 @@ module CMD
         sout.abort($!) unless sout.aborted?
         raise $!
       ensure
+        # No fd leak in the non-pipe path either: flush what CMD opened and
+        # close it (a caller provided IO stays open, closing is up to it)
+        if save_stderr_dst
+          begin
+            save_stderr_dst.flush if save_stderr_dst.respond_to?(:flush) && ! save_stderr_dst.closed?
+          rescue Exception
+            Log.exception $!
+          end
+          save_stderr_dst.close if save_stderr_close && ! save_stderr_dst.closed?
+        end
         post.call if post
       end
     end
