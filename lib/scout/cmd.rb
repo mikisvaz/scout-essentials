@@ -273,7 +273,11 @@ module CMD
                                 end
     pid = wait_thr.pid
 
-    Log.debug{"CMD: [#{pid}] #{cmd}".strip if log}
+    if Log.severity >= 2
+      Log.medium("CMD [#{pid}] #{Log.fingerprint(cmd)}")
+    else
+      Log.debug("CMD [#{pid}] #{cmd.strip}")
+    end
 
     # ScoutCoder: :timeout support.  A watchdog thread starts a counter
     # (deadline) for the command; if the process is still running when the
