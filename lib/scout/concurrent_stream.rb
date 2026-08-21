@@ -93,7 +93,14 @@ module ConcurrentStream
             if ! (t.value.success? || no_fail)
 
               if log
-                msg = "Error joining #{self.filename || self.inspect}. Last log line: #{log}"
+                if std_err && log.length < 10 && !(log.downcase.include?("error") || log.downcase.include?('exception'))
+                  exception_line = std_err.split("\n").reverse.find{|line| line.downcase.include?("error") || line.downcase.include?('exception') }
+                end
+                if exception_line
+                  msg = "Error joining #{self.filename || self.inspect}. Exception line: #{exception_line}"
+                else
+                  msg = "Error joining #{self.filename || self.inspect}. Last log line: #{log}"
+                end
               else
                 msg = "Error joining #{self.filename || self.inspect}"
               end
