@@ -56,7 +56,7 @@ module Log
         thr = short_mean
       else
         thr = begin
-                d = Time.now - @start
+                d = Time.now - (@start || Time.now)
                 if d == 0
                   1
                 else
