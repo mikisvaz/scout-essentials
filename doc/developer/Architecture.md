@@ -1,185 +1,147 @@
 # Architecture
 
-This document explains the internal architecture of scout-essentials: how
-modules depend on each other, what the key abstractions are, and how data
-flows through the library.
+This page describes how the parts of scout-essentials fit together: the
+module dependency graph, the load order, and where the boundaries to the
+rest of the Scout ecosystem are. Everything here is derived from the source
+under `lib/`.
 
-## Module map
-
-Scout-essentials consists of twelve primary modules organized into four
-functional layers:
-
-### Foundation layer (no internal dependencies)
-
-| Module | Purpose |
-|--------|---------|
-| `Log` | Logging, progress bars, colored output, fingerprinting |
-| `Misc` | General-purpose helpers (format, digest, math, system, hooks) |
-| `TmpFile` | Temporary file and directory management |
-| `Annotation` | Runtime object extension for metadata |
-| `IndiferentHash` | Key-indifferent hash access |
-| `SimpleOPT` (SOPT) | Command-line option parsing |
-
-### I/O layer (depends on foundation)
-
-| Module | Purpose |
-|--------|---------|
-| `Open` | Unified file I/O: local, compressed, remote |
-| `Path` | Logical-to-physical path resolution via path maps |
-| `CMD` | External command execution with streaming |
-
-### Concurrency layer (depends on I/O)
-
-| Module | Purpose |
-|--------|---------|
-| `ConcurrentStream` | Lifecycle management for IO streams |
-
-### Persistence layer (depends on all above)
-
-| Module | Purpose |
-|--------|---------|
-| `Persist` | Content-addressed caching with serialization |
-| `Resource` | On-demand file production via claims |
-
-## Dependency graph
+## Modules and dependencies
 
 ```
-Log, Misc, TmpFile (foundation — no internal deps)
-        ↑
-Annotation, IndiferentHash, SimpleOPT
-        ↑
-Open, Path, CMD
-        ↑
-ConcurrentStream
-        ↑
-Persist, Resource
+IndiferentHash  (no internal dependencies)
+      ^  ^
+      |  \-----------------\
+Annotation  (standalone)     \
+      ^                       \
+      |                        \
+Misc::Digest <- Path  -----> Resource (annotation-based)
+      ^           ^               ^  ^   ^
+      |           |               |  |   \
+  TmpFile --> Open --> CMD --> ConcurrentStream
+                ^          ^
+                |          |
+              Lockfile   (required BY CMD, not the other way round)
 ```
 
-Key cross-module dependencies:
-- **Open** depends on Log, TmpFile, Path, ConcurrentStream.
-- **Path** depends on Log, Misc, Annotation.
-- **CMD** depends on Log, Open, ConcurrentStream, TmpFile.
-- **Persist** depends on Log, Open, Path, TmpFile.
-- **Resource** depends on Log, Open, Path, Persist, CMD.
-- **ConcurrentStream** depends on Log.
+Reading the edges as "requires":
 
-## Key abstractions
+- `IndiferentHash` requires nothing else internally.
+- `Annotation` is a standalone mixin framework; `Path` and `Resource`
+  *extend* it, which is how `Path`/`Resource` metadata (pkgdir, libdir,
+  `@where`, `@original`, ...) attaches to plain Strings. This
+  **annotation-based unification** means a `Path` object is just a String
+  carrying annotations, and `Resource` is a module (not a class) whose
+  class-level state (`pkgdir`, `rake_dirs`, `path_maps`, `map_order`,
+  `lock_dir`) is read through those annotations.
+- `Path` requires `Misc::Digest` (for `digest` naming) and the annotation
+  framework.
+- `TmpFile` requires `Open`; the arrow therefore points **TmpFile → Open**
+  (not "Open depends on TmpFile").
+- `Open` requires `Path` and `CMD`; `Open::Remote` shells out through
+  `CMD`. `Open` *uses* `TmpFile` helpers at runtime but does not require the
+  file.
+- `CMD` requires `ConcurrentStream` (and `Open::Stream`); `ConcurrentStream`
+  does not require `CMD`.
+- `Resource` requires `Log` and `Path` only — it does **not** depend on
+  `Persist`.
+- `Persist` requires `Open` (and through it `CMD`); it never touches
+  `Resource`.
+- `Log` colors come from `term-ansicolor`; there is **no `Log::Color`
+  constant**.
+- The `Lockfile` implementation is **vendored** at
+  `lib/scout/open/lock/lockfile.rb` and used by `Open.lock`.
 
-### The annotated object
+## Load order and entry points
 
-The most important pattern: extend a Ruby object (String, Array, Hash, IO)
-with a module at runtime. Path is an annotated String. NamedArray is an
-annotated Array. IndiferentHash is a setup-based Hash. This preserves type
-compatibility while adding behavior.
-
-See [Annotation System](AnnotationSystem.md) for implementation details.
-
-### The setup convention
-
-Nearly every module provides a `.setup` class method that extends an
-object and initializes state:
+`lib/scout-essentials.rb` is the **only** entry point; there is no
+`lib/scout.rb`:
 
 ```ruby
-Path.setup(str)                    # annotate + init path metadata
-NamedArray.setup(arr, fields)      # annotate + init field names
-IndiferentHash.setup(hash)         # annotate + enable indifferent access
-ConcurrentStream.setup(io, ...)    # annotate + register lifecycle
+require_relative 'scout/exceptions'
+require_relative 'scout/indiferent_hash'
+require_relative 'scout/tmpfile'
+require_relative 'scout/log'
+require_relative 'scout/path'
+require_relative 'scout/simple_opt'
+require_relative 'scout/resource'
+require_relative 'scout/resource/scout'
+require_relative 'scout/persist'
+require_relative 'scout/config'
 ```
 
-### The lifecycle block
+Notes on the cascade:
 
-Resources that need cleanup (temp files, open streams, locks) provide a
-block form that handles cleanup automatically:
+- `Annotation`, `Misc`, `CMD`, `ConcurrentStream`, `Open` and `Persist`'s
+  sub-files are pulled in indirectly (e.g. `scout/path` requires
+  `scout/annotation`; `scout/persist` requires `scout/persist/serialize`,
+  `scout/persist/open`, `scout/persist/path`).
+- `scout/resource/scout` defines `Scout` (`extend Resource`, `pkgdir =
+  'scout'`, `Resource.default_resource = Scout`) and loads
+  `Path.load_path_maps(Scout.etc['path_maps'])`.
+- `Misc::NamedArray` and `Misc::Hook` are **not** auto-loaded; they live in
+  `lib/scout/named_array.rb` and `lib/scout/misc/hook.rb` and are required
+  explicitly by the file that needs them.
+- `scout/config` runs last and provides the `Scout::Config` module (not a top-level `Config` constant).
 
-```ruby
-TmpFile.with_file { |tmp| ... }    # delete after block
-Open.open(file) { |io| ... }       # close after block
-Persist.persist(...) { ... }       # lock + write after block
-```
+## Lock namespaces
 
-### Command execution: String and Array forms
+There are three distinct lock directories, all under `$HOME/.scout/tmp`:
 
-CMD.cmd accepts the command in two forms that share the same lifecycle,
-streaming, and error-handling code path but differ in how the command
-reaches the operating system:
+| Namespace | Constant/definition | Used by |
+|-----------|---------------------|---------|
+| `tmp/persist_locks` | `Persist.lock_dir` | `Persist.persist` while (re)computing a cache entry |
+| `tmp/produce_locks` | `Resource.default_lock_dir` | `Resource#produce` while materializing a resource |
+| `tmp/sensible_write_locks` | `Open.sensible_write_lock_dir` | `Open.sensible_write` atomic writes |
 
-**String form** (`CMD.cmd("echo hello")`): the command is treated as a
-shell command. Options from the hash are interpolated via the `{opt}`
-placeholder or appended, using `process_cmd_options` to build the option
-string. The tool registry is consulted when a Symbol is passed. The final
-string is handed to `Open3.popen3(ENV, cmd)`, which spawns a shell.
+`Persist.lock` does **not exist** — the locking primitive is
+`Open.lock(filename, &block)`, built on the vendored `Lockfile`.
 
-**Array form** (`CMD.cmd(["echo", "hello"])`): the command is executed
-directly — no shell is spawned. Options from the hash are converted to
-separate argument strings by `process_cmd_options_array` (the array
-counterpart of `process_cmd_options`) and appended to the command array.
-The tool registry is not consulted. The array is passed to
-`Open3.popen3(ENV, *cmd_array)`, which calls `execve` directly.
+## Fork model
 
-The branch is selected by checking `Array === tool` at the top of
-`CMD.cmd`. After this branch, both forms converge: the same IO-handling
-code feeds stdin, wraps output in ConcurrentStream, logs stderr, checks
-exit status, and raises `ProcessFailed` on failure. For logging and error
-messages, the array form builds a human-readable string by quoting elements
-that contain spaces.
+`CMD` runs subprocesses through `Open3`, wiring stdout/stderr into
+`ConcurrentStream`s so that streaming consumers can read while the process
+is alive. Aborting a `CMD` kills the child process and aborts the attached
+streams. `Resource#produce` for rake claims forks a `ScoutRake` invocation,
+so a failed rake does not leave partial files behind
+(`Open.sensible_write` removes them).
 
-See [Running Commands](../user/RunningCommands.md) for usage guidance.
+## Packaging
 
-## Data flow
+`scout-essentials.gemspec` is generated by juwelier from the `Juwelier::Tasks`
+block in the `Rakefile` ("DO NOT EDIT THIS FILE DIRECTLY"). That block lists
+four runtime dependencies — `term-ansicolor`, `yaml`, `rake`, `listen` — and
+the checked-in gemspec mirrors them as `add_runtime_dependency` entries
+(lines 172-175). Each is actually used from `lib/`: `term/ansicolor`
+(`scout/log/color.rb`), `yaml` (`scout/persist/open.rb`,
+`scout/log/progress/report.rb`), `rake` (`scout/resource/produce/rake.rb`),
+`listen` (`scout/open/util.rb`, loaded lazily when a watcher is requested).
+Nothing else is required at runtime; in particular scout-essentials does
+not depend on scout-gear, rbbt-util, or any TSV/Workflow/Step
+implementation.
 
-### File resolution and reading
+## Ecosystem boundaries and attribution
 
-```
-logical path (String)
-    ↓ Path.setup
-Path object (annotated String)
-    ↓ path.find
-physical path (resolved across maps)
-    ↓ Open.read
-content (String or IO)
-```
+scout-essentials is a **substrate library**. The following well-known Scout
+concepts are **not** implemented here; each row says where they actually
+live:
 
-### Command pipeline
+| Concept | Where it lives |
+|---------|----------------|
+| `TSV`, `TSV::Dumper`, `Annotation.tsv` | scout-gear (`scout/tsv`) |
+| `Workflow`, `Task`, `Step`, `Step#info` / `.info` files | scout-gear (`scout/workflow`) |
+| Job/step persistence beyond `Persist` (`.info` directory, `files/`) | scout-gear |
+| HPC / scheduler (`slurm`, `lsf`, `pbs`, orchestrators) | scout-gear / scout-rig |
+| `notify` / `send_email` helpers | scout-gear |
+| `Bgzf` (blocked gzip) | scout-gear |
+| `deep_indifferent` | **does not exist anywhere in the ecosystem** |
+| Scout CLI (`scout` executable, `scout_commands/`) | scout-gear |
+| rbbt-util shims (e.g. `rbbt-util` compatibility aliases) | UNVERIFIED — not present in this repo's `lib/` |
 
-```
-CMD.cmd("producer", pipe: true)
-    ↓
-ConcurrentStream (IO with lifecycle)
-    ↓ feed as stdin
-CMD.cmd("consumer", in: stream, pipe: true)
-    ↓
-ConcurrentStream
-    ↓ stream.join
-final output + exit status check
-```
-
-### Resource production
-
-```
-Resource.data.file (Path)
-    ↓ path.produce
-    ↓ check Resource claims
-    ↓ acquire Persist lock
-    ↓ run production (download / proc / rake)
-    ↓ Open.sensible_write (atomic)
-physical file
-```
-
-## Extension points
-
-1. **Annotation modules** — Create new modules with `extend Annotation` to
-   add metadata to any object.
-2. **Path maps** — Add search locations with `Path.add_path`.
-3. **Persist drivers** — Register custom serialization types.
-4. **Resource claim types** — Extend `Resource.produce` for new types.
-5. **Log color schemes** — Extend `Log::Color` for custom colors.
-6. **CMD tools** — Register tools for auto-installation.
+When writing documentation or examples for this repo, do not present those
+as features of scout-essentials.
 
 ## Related
 
-- [Design Principles](DesignPrinciples.md) — Coding philosophy and idioms.
-- [Annotation System](AnnotationSystem.md) — Core extension pattern.
-- [Path Resolution](PathResolution.md) — Map-based file resolution.
-- [Streaming Model](StreamingModel.md) — ConcurrentStream lifecycle.
-- [Persistence and Resources](PersistenceAndResources.md) — Caching and
-  production.
+- [Path Resolution](PathResolution.md) for the `Path`/`Resource` machinery.
+- [Persistence and Resources](PersistenceAndResources.md) for `Persist` and
+  `Resource#produce` contracts.

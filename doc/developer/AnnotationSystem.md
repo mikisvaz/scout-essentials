@@ -1,183 +1,184 @@
 # Annotation System
 
-This document explains how the Annotation system works internally. It is
-intended for framework contributors who need to understand or extend the
-annotation machinery.
+Annotations attach named metadata to **ordinary Ruby objects** without
+wrapping them and without changing their class. The same mechanism is what
+makes `Path`, `Resource` and `NamedArray` work, so understanding it is a
+prerequisite for [Path Resolution](PathResolution.md) and
+[Persistence and Resources](PersistenceAndResources.md).
 
-## Why this abstraction exists
+Everything on this page is backed by `tmp/rewrite_C/probe_01..04.rb` and
+probes P36–P42 in `research/behavior-probes.md`, run against the current
+`lib/scout/annotation*.rb`.
 
-Annotation solves a recurring problem: you need to attach metadata to an
-object (typically a String or Array) without changing its class. In the
-Scout framework, Path objects are annotated Strings, NamedArray objects are
-annotated Arrays, and several other modules follow the same pattern.
+## Load path
 
-The alternative — subclassing — is limiting because Ruby's String and Array
-are not easily subclassable without losing compatibility with standard
-library methods and because subclass instances are not "just a String" to
-type-checking code.
+`lib/scout-essentials.rb` does **not** require `scout/annotation` directly.
+`Annotation` becomes available because `scout/path` requires it
+(`lib/scout/path.rb:1`), so `require 'scout-essentials'` gives you the
+constant (`Object.const_defined?(:Annotation) => true`, probe_03) — but a
+library that only wants annotations can `require 'scout/annotation'` on its
+own.
 
-Annotation provides a uniform way to extend objects at runtime: define a
-module, declare attributes, and apply it with `setup`.
-
-## How it works
-
-### Module definition
+## The DSL
 
 ```ruby
-module MyAnnotation
+module SampleInfo
   extend Annotation
-  annotation :attr1, :attr2
+  annotation :organism, :tissue
 end
 ```
 
-When `extend Annotation` runs:
-1. The module gains class methods: `setup`, `purge`, `included`, `annotation`.
-2. A `ANNOTATIONS` list is initialized on the module.
-3. `annotation_types` accessor is added.
+`extend Annotation` turns the module into an **AnnotationModule**. The
+`annotation` class-level call does three things (annotation_module.rb):
 
-When `annotation :attr1, :attr2` runs:
-1. `attr_accessor :attr1, :attr2` is called on the module.
-2. `:attr1` and `:attr2` are appended to the module's `ANNOTATIONS` list.
+- declares the attribute list, kept in module state `@annotations` and read
+  with `SampleInfo.annotations` (there is **no `ANNOTATIONS` constant**);
+- defines reader/writer methods (`#organism`, `#organism=`) for when the
+  module is mixed into an object;
+- registers the module so `Annotation.setup` can resolve type names.
 
-### The `setup` method
+## `setup` and the binding rules
 
-```ruby
-MyAnnotation.setup(obj, attr1: "value")
-```
-
-`setup` performs these steps:
-1. Extends `obj` with `MyAnnotation` (if not already extended).
-2. Merges annotation types: `obj.annotation_types` is updated to include
-   `MyAnnotation` plus all its super-module annotations.
-3. Sets the annotation attributes from the keyword arguments or positional
-   values.
-4. Returns `obj`.
-
-If `obj` is frozen, `setup` duplicates it first.
-
-### The annotated object
-
-After setup, the object has:
-- Instance variable accessors for each annotation attribute.
-- An `annotation_types` array listing all annotation modules applied.
-- All original methods of its base class (String, Array, etc.).
-
-### Annotation propagation
-
-Some Array methods are annotated-method-aware: they propagate annotations
-from the source array to the result. This is implemented via
-`AnnotatedArray`, which extends the behavior of annotated arrays.
-
-When an array is annotated and extended with `AnnotatedArray`, these methods
-propagate annotations:
-- `+`, `==`, `each`, `[]`, `collect`, `map`, `compact`, `flatten`, `uniq`,
-  `zip`, `values_at`, `first`, `last`, `[]`/slice, and more.
-
-Methods not in this list (e.g., `filter_map`, `tally`) do **not** propagate
-annotations.
-
-## Key invariants
-
-1. **Annotated objects keep their original class.** `MyAnnotation.setup(str)`
-   does not change `str.class`. The object is still a String.
-2. **`setup` is idempotent.** Calling `setup` multiple times with the same
-   module merges annotations; it does not create duplicate entries.
-3. **`setup` handles frozen objects.** If the target is frozen, `setup`
-   duplicates it and annotates the duplicate.
-4. **Annotation attributes default to nil.** Unset attributes return nil,
-   not an error.
-5. **`annotation_types` is cumulative.** If multiple annotation modules are
-   applied, `annotation_types` lists all of them.
-
-## Extension points
-
-### Creating new annotation modules
+`AnnotationModule#setup(obj, values = nil, &block)` is the constructor. The
+values may be given as a Hash or positionally, and a block is an alternative
+source for the object itself:
 
 ```ruby
-module MyMetadata
-  extend Annotation
-  annotation :foo, :bar
-end
+SampleInfo.setup('S003', organism: 'Human', tissue: 'Liver')
+SampleInfo.setup('S004', %w[Human Liver])          # positional, same order
+SampleInfo.setup { 'S005' }                         # block-as-object
 ```
 
-This is the primary extension point. Any module that `extends Annotation`
-becomes an annotation module.
+Rules verified in probe_01/probe_02:
 
-### Adding attributes later
+- **In-place extension.** `setup` calls `obj.extend SampleInfo` on the object
+  you pass and returns **that same object** (`setup(s).equal?(s) => true`) —
+  except when the object is **frozen**, in which case `obj.dup` is annotated
+  and returned instead; always use the return value of `setup`.
+- **TypeError → un-annotated.** Objects that cannot hold singleton methods
+  (`Integer` literals, symbols) raise `TypeError: can't define singleton`;
+  `setup` rescues it and returns the *plain* object with no metadata.
+- **`:annotation_types` is reserved.** Each annotated object gets an
+  `@annotation_types` array; declaring `annotation :annotation_types` collides
+  with it (probe_01: writing to it raised `NoMethodError` against `nil`).
+
+## Introspection and serialisation
+
+State lives on the object, the type list on the object too:
 
 ```ruby
-MyMetadata.annotation :baz  # adds :baz to ANNOTATIONS and creates accessor
+s = SampleInfo.setup('S003', organism: 'Human', tissue: 'Liver')
+
+SampleInfo.annotations           # => [:organism, :tissue]   (module state)
+s.annotation_types               # => [SampleInfo]           (module objects!)
+Annotation.is_annotated?(s)      # => true
+s.is_a?(SampleInfo)              # => true  (extend really happened)
+s.is_a?(String)                  # => true  (class unchanged)
 ```
 
-### Purging annotations
+`annotation_types` holds the **module objects**, never their names —
+`s.annotation_types.include?(SampleInfo)` is the correct membership test.
+
+`AnnotatedObject` (mixed into every annotated object) provides:
 
 ```ruby
-MyMetadata.purge(obj)  # removes annotation methods and state from obj
+s.annotation_hash   # => {:organism=>"Human", :tissue=>"Liver"}
+s.annotation_info   # => {:organism=>"Human", :tissue=>"Liver",
+                    #     :annotation_types=>[SampleInfo], :annotated_array=>false}
+s.serialize         # => {...same, :literal=>"S003"}   (values purged recursively)
+s.annotation_id     # => "860c73f490edb8115064663b7f579d73"
 ```
 
-### AnnotatedArray
+- `annotation_hash` — the declared attributes only;
+- `annotation_info` — plus `:annotation_types` and `:annotated_array`;
+- `serialize` — `annotation_info` merged with `:literal` (the object itself),
+  with every value passed through `Annotation.purge` (annotated_object.rb:23);
+  this is what the `:annotation` serialisation driver consumes. It is **only a
+  Hash here**; the TSV form (`Annotation.tsv` / `Annotation.load_tsv`) lives in
+  scout-gear, not in this repo (attribution table in
+  [Architecture](Architecture.md));
+- `annotation_id` (aliased `id`) — `Misc.digest([self, annotation_info])`.
 
-If you need annotation propagation through array operations, ensure your
-annotation module works with AnnotatedArray. NamedArray extends
-AnnotatedArray to provide this behavior.
+### Module-level helpers
 
-## Interactions with other subsystems
+- `Annotation.is_annotated?(obj)` — true if any annotation module is mixed in.
+- `Annotation.purge(obj)` — **recursive**: for an annotated object it calls the
+  instance `#purge`; for Arrays/Hashes it purges each element; otherwise it
+  returns the object unchanged.
+- `Annotation.setup(obj, "A|B", hash)` — the generic deserialiser. The type
+  string is split on `|`, each name resolved with `Object.const_get`. **Unknown
+  names only warn and are skipped** (`Log.warn "Annotation NoSuchAnnotation not
+  defined"`, probe_01) — no exception.
 
-- **Path** — Path is an annotation module. Path.setup(str) annotates a
-  string with path resolution behavior and metadata (pkgdir, libdir,
-  path_maps, map_order).
-- **NamedArray** — NamedArray extends Annotation and AnnotatedArray. It
-  adds named field accessors to arrays.
-- **IndiferentHash** — While not itself an Annotation module, it follows the
-  same setup-based pattern and is often used alongside annotations.
-- **ConcurrentStream** — Uses the setup pattern but is not an Annotation
-  module. It extends IO objects directly.
-- **Open** — Open functions return streams annotated with NamedStream (a
-  module that adds `.filename` and `.digest_str` to IO objects).
+### Instance-side helpers
 
-## Common pitfalls
+- `#purge` — returns a **copy**: it removes `@annotation_types`, `@annotations`
+  and every attribute ivar from a `dup` (and purges nested values) and returns
+  it. The object's own class is kept (a purged `SampleInfo` String is still a
+  `String`, no longer `is_a?(SampleInfo)`); always use the return value.
+- `#make_array` — wraps `self` in a **one-element Array** carrying the same
+  annotations and extends it with `AnnotatedArray` (annotated_object.rb:75-80);
+  it does not annotate the receiver's elements.
+- `#annotate(other)` — copies the current annotations onto another object.
 
-### Forgetting `extend Annotation`
+## Round-trips and copies
+
+- **Marshal round-trips** annotations (P42, probe_01): the singleton modules
+  survive dump/load.
+- **Only `dup` loses them; `clone` keeps them** (probe_02:
+  `dup is_annotated? => false`, `clone is_annotated? => true, .a => 1` —
+  `clone` copies the singleton class, `dup` does not): to re-annotate a `dup`
+  copy the metadata explicitly with `annotation_hash` →
+  `Annotation.setup` / `MyModule.setup`, or call `#annotate` on the copy.
+
+## `AnnotatedArray`
+
+`extend AnnotatedArray` on an annotated Array — the pattern used throughout
+`test/scout/annotation/test_array.rb` — makes the *elements* carry the
+container's annotations:
 
 ```ruby
-# WRONG: won't have setup, annotation, or annotation_types
-module Bad
-  annotation :foo  # NoMethodError
-end
-
-# RIGHT
-module Good
-  extend Annotation
-  annotation :foo
-end
+arr = SampleInfo.setup(%w[S001 S002], organism: 'Human')
+arr.extend AnnotatedArray
+arr[0].organism        # => "Human"
+arr.first.organism     # => "Human"
 ```
 
-### Assuming subclass-level type checks
+Overrides provided in `lib/scout/annotation/array.rb`:
 
-```ruby
-annotated_str = MyAnnotation.setup("hello")
-annotated_str.is_a?(String)  # => true
-annotated_str.is_a?(MyAnnotation)  # => false (it's extended, not subclassed)
-```
+- `[]` `(pos, clean = false)` — the element is re-annotated unless the second
+  argument is truthy, in which case it is returned clean (probe_09: a fresh
+  array's `fresh[0, true]` is an un-annotated `String` while `fresh[1]` is
+  annotated);
+- `first`, `last`, `each_with_index`, `each`, `inject`, `collect`, `select` —
+  re-annotated;
+- `compact`, `uniq`, `flatten`, `reverse`, `sort_by` — re-annotated;
+- `subset(list)`, `remove(list)` — set operations (`&`, `-`) with
+  re-annotation.
 
-To check if an object has an annotation, use `annotation_types` or
-`respond_to?`:
+**Limits** — live probe `tmp/rewrite_C/probe_09_annotated_array.rb` (method
+owners plus actual results): `map`, `zip`, `filter_map`, `flat_map`,
+`each_slice`, `values_at` and `count` are **not overridden** (their owner is
+`Array`/`Enumerable`) and return plain results with no annotations — `ary.map
+{ |x| x }` yields `[false, false, false]` under `Annotation.is_annotated?`,
+while `ary.each` yields `[true, true, true]`, and `zip` keeps annotations only
+on the container-side elements.
 
-```ruby
-annotated_str.annotation_types.include?("MyAnnotation")  # => true
-annotated_str.respond_to?(:foo)  # => true
-```
+**Requirement:** elements must be extendable. `AnnotatedArray` over an Array
+of `Integer`s raises `TypeError: can't define singleton` (probe_09) — use
+Strings or other extendable objects.
 
-### Annotation not propagating through array methods
+## NamedArray is a separate thing
 
-If you annotate an array and then call a method not in AnnotatedArray's
-propagation list, the result loses annotations. For example, `filter_map`
-and `tally` do not propagate. If you need propagation, convert to
-NamedArray or manually re-annotate the result.
+`NamedArray` (`lib/scout/named_array.rb`) is an Annotation module over Arrays
+giving field-name access to positions. It does **not** extend
+`AnnotatedArray` and is not a String type. It needs an explicit
+`require 'scout/named_array'`. See [Annotating
+Data](../user/AnnotatingData.md).
 
 ## Related
 
-- [Architecture](Architecture.md) — How Annotation relates to other modules.
-- [Design Principles](DesignPrinciples.md) — The annotated object idiom.
-- For detailed code investigation, see
-  [`../../research/annotations-data-analysis.md`](../../research/annotations-data-analysis.md).
+- [Path Resolution](PathResolution.md) — `Path` is an annotated module.
+- [Persistence and Resources](PersistenceAndResources.md) — `Resource` is an
+  annotated module; `:annotation` serialisation uses `serialize`.
+- [Annotating Data](../user/AnnotatingData.md) — the user-facing API.

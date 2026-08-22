@@ -1,228 +1,189 @@
 # Command-Line Options
 
-This guide explains how to define and parse command-line options in
-scout-essentials using the SOPT (SimpleOPT) module.
+`SOPT` is scout-essentials' option parser: a small registry of inputs,
+shortcuts and descriptions plus a **destructive** consumer that edits
+`ARGV` in place. It is deliberately minimal — no subcommands, no coercion
+beyond booleans, no config-file layer.
 
-## When to use this
+## Declaring inputs
 
-- You're writing a command-line script or tool.
-- You need to parse `-f`, `--flag`, `--option=value` style options.
-- You want auto-generated help text from compact definitions.
-- You need a lightweight alternative to `optparse`.
+Options are declared as a single string. Each entry is one line:
 
-## Concepts
-
-### SOPT: Simple Option Parsing
-
-SOPT provides a compact DSL for declaring command-line options and parsing
-them from ARGV. It supports short and long option names, boolean flags,
-string-valued options, defaults, and descriptions.
-
-```ruby
-require 'scout/simple_opt'
-
-# Declare options
-SOPT.parse <<~DOC
-  -f--file*: Input file (required)
-  -o--output: Output directory
-  -v--verbose: Enable verbose output
-DOC
-
-# Parse ARGV
-options = SOPT.consume
-# => { file: "data.txt", verbose: true, output: nil }
+```
+-[short]--[long][*] description
 ```
 
-## Basic usage
-
-### Defining options with a documentation string
-
-The most common way to define options is with a heredoc string:
-
 ```ruby
-SOPT.parse <<~DOC
-  -f--file* File to process
-  -o--output=results Output directory
-  -v--verbose Verbose output
-DOC
+require 'scout-essentials'
+
+SOPT.parse <<~OPT
+  -o--organism* Organism code
+  -t--tissue*   Tissue of origin
+  -d--dry-run   Do not write anything
+OPT
 ```
 
-Syntax breakdown:
+The `*` suffix is the **only** type marker: it marks the option as taking a
+string value. Without it the option is a boolean (`lib/scout/simple_opt/parse.rb:53`).
+It does **not** mean "required".
 
-| Component | Meaning |
-|-----------|---------|
-| `-f` | Short form (single dash) |
-| `--file` | Long form (double dash) |
-| `*` | Required option |
-| `=results` | Default value |
+`SOPT.setup(str)` parses the same grammar from a fuller usage document —
+summary, synopsis (a line starting with `$`), description and options — and
+then immediately calls `SOPT.consume`, so it both registers and consumes
+`ARGV` in one step (`lib/scout/simple_opt/setup.rb`).
 
-### Parsing options
+The registry lives in module-level accessors (`simple_opt/accessor.rb`):
+`inputs`, `input_types`, `input_shortcuts`, `shortcuts`, `input_descriptions`,
+`input_defaults`.
 
-After defining options, call `SOPT.consume` to parse `ARGV`:
-
-```ruby
-options = SOPT.consume
-file = options[:file]
-verbose = options[:verbose]
-```
-
-### Using parsed options
-
-Parsed options are returned as an IndiferentHash (string/symbol keys work):
+## Consuming the command line
 
 ```ruby
-options = SOPT.consume
-
-puts options[:file]    # symbol key
-puts options["file"]   # string key — same value
+options = SOPT.consume          # defaults to ARGV, which it MUTATES
 ```
 
-## Option syntax
+`SOPT.consume(args = ARGV)` walks `args` left to right and **deletes**
+every token it recognises:
 
-### Required options
-
-Mark required options with `*`:
+- a matching `--long` or `-s` is removed and, if the input takes a value,
+  the following token (or `=value`) is removed with it;
+- unknown flags and free-standing words are left alone;
+- `--` stops the whole loop: everything after it is left in `args`.
 
 ```ruby
-SOPT.parse "-f--file* Required input file"
+# probe_02 (tmp/rewrite_C/probe_02_sopt.rb)
+argv = ['-o', 'Human', '--tissue', 'Liver', 'positional', '-d']
+SOPT.consume(argv)
+# => {:organism=>"Human", :tissue=>"Liver", :"dry-run"=>true}
+# argv is now ["positional"]
+
+argv = ['-d', '--', '--not-an-option', '-x']
+# => {:"dry-run"=>true}; argv unchanged from "--" onwards
 ```
 
-If a required option is missing, SOPT raises an error.
+Because the array is edited in place, `SOPT.consume` is how a program
+separates its own options from the positional arguments it will still read.
 
-### Boolean flags
+### Boolean parsing
 
-Options without a value are treated as boolean flags:
+Booleans are true unless the value is one of `F`, `false`, `FALSE`, `no`
+(`simple_opt/get.rb:45`):
+
+- `--dry-run=false`, `--dry-run=F` → `false`
+- `--dry-run` → `true`
+- `--dry-run false` → `false`, and Ruby logs a warning telling you to use
+  `=` instead — this convenience swallows the next token, so use `=`.
+
+A word that merely *follows* a boolean flag and is not one of those four is
+**not** eaten: `['--dry-run', 'stray']` leaves `"stray"` in `ARGV`
+(probe_02).
+
+## State and reuse
+
+`SOPT.consume` writes two things:
+
+- the return value (an `IndiferentHash` with symbol keys), which is also
+  stashed as `@@current_options`; `SOPT.current_options = hash` lets you
+  seed it;
+- `SOPT::GOT_OPTIONS`, a module-level hash that is **merged into, never
+  reset**. Every `consume` call accumulates there, which is how
+  sub-commands that each declare their own inputs still end up with a
+  global picture of what was given (probe_02: two separate `consume` calls
+  on disjoint inputs both appear in `GOT_OPTIONS`).
+
+`SOPT.get(opt_str)` is just `parse` followed by `consume(ARGV)`.
+
+### `SOPT.require` — the only enforcement
+
+Nothing about a declared option is required. If you want to fail on a
+missing option, call it yourself:
 
 ```ruby
-SOPT.parse "-v--verbose Enable verbose mode"
-
-# Usage:
-#   ruby script.rb -v      # verbose: true
-#   ruby script.rb         # verbose: false (default)
+SOPT.require(options, :organism, :tissue)
+# raises ParameterException: Parameter 'tissue' not given
 ```
 
-### Defaults
+`ParameterException < ScoutException < StandardError` (probe_02), so plain
+`rescue` works. There is **no** variant that extracts a subset of the
+options — `SOPT.get` always parses a fresh string and consumes the whole
+`ARGV`.
 
-Use `=value` for defaults:
+## Help text
 
-```ruby
-SOPT.parse <<~DOC
-  -t--threads=4 Number of threads
-DOC
+`SOPT.doc` renders a man-page-style document:
 
-# If not provided, threads defaults to "4"
+```text
+myprog(1) -- <summary>
+=========================
+
+## SYNOPSYS
+
+myprog [--organism=<string>] [--tissue=<string>] [--dry-run[=false]]
+
+## OPTIONS
+
+-o,--organism=<string>   Organism code
+...
 ```
 
-### Short and long forms
+The header really is `## SYNOPSYS` — the misspelling is in the source
+(`simple_opt/doc.rb:112`) and callers grep for it; do not "fix" it in your
+matching code. `SOPT.usage` prints the doc and calls `exit 0` (probe_07 traps
+`SystemExit` and reports status 0).
 
-Short forms are optional but recommended for frequently used options:
+`SOPT.input_doc` (used by `doc`) is also the public way to format an
+explicit option list, and `SOPT.input_array_doc` formats
+`[[name, type, description, default, options], ...]` arrays — that is the
+form `Workflow`-level code uses to pass shortcut choices through.
 
-```ruby
-SOPT.parse <<~DOC
-  -f--file Input file
-  -o--output Output path
-  -n--dry-run Dry run mode
-DOC
+## Shortcuts and `fix_shortcut`
 
-# Both forms work:
-#   ruby script.rb -f data.txt
-#   ruby script.rb --file data.txt
-```
+Every declared long name automatically gets a short form: the first letter
+of the long name, if it is free (`simple_opt/doc.rb:33`,
+`fix_shortcut(name[0], name)`). When it is taken, `SOPT.fix_shortcut`
+searches for a free one:
 
-## Advanced usage
+1. an existing shortcut already bound to that exact long name is reused;
+2. if the long name contains `-` or `_`, the initials of its parts
+   (`--max-cpu` → `-m` if free, else the accumulated initials);
+3. if it contains digits, the first letter plus the number;
+4. otherwise it walks forward through the letters.
 
-### Programmatic registration
+If no shortcut can be found, `fix_shortcut` returns `nil` and the option
+simply has no short form. **Collisions are silent**: declaring `-a--alpha`
+and `-a--also` yields `{"a"=>"alpha", "al"=>"also"}` — the second entry
+gets a longer shortcut rather than an error (probe_02). Live probe
+(`tmp/rewrite_C/probe_07_sopt_extra.rb`): registering `t` while `-t` is
+bound to `tissue` yields `"th" => "threshold"`; `another_one` gets the
+initials `"ao"`; `alpha2` gets `"a2"`.
 
-Instead of a documentation string, register options individually:
+`SOPT.delete_inputs(['organism'])` removes an input from `inputs`,
+`input_shortcuts`, `shortcuts`, `input_types`, `input_defaults` and
+`input_descriptions` (`simple_opt/accessor.rb:39`). `input_shortcuts` is the
+reverse map `{'organism'=>'o'}` (probe_07).
 
-```ruby
-SOPT.register("f", "file", "*", "Input file")
-SOPT.register("o", "output", nil, "Output path")
-```
+`SOPT.reset` clears **only** `shortcuts` and the internal `all` registry;
+`inputs` and the other per-input tables survive (probe_02). Call
+`SOPT.delete_inputs(SOPT.inputs.dup)` if you actually want an empty slate.
 
-The `register` signature is: `register(short, long, asterisk, description)`.
-- `short`: nil, true (auto-pick), or a letter.
-- `long`: the long option name.
-- `asterisk`: "*" for required, nil otherwise.
-- `description`: help text.
+## Quirks to design around
 
-### Auto-generated help text
+- Repeating the same boolean flag just re-sets it to `true`; string
+  options keep the last value (the hash is overwritten).
+- `--opt=value` and `--opt value` are equivalent; `--opt=` (empty value)
+  yields `""`.
+- `-x` unknown: left in `ARGV`, ignored.
+- `--` is not removed from `ARGV` either; it only stops scanning.
+- Options are keyed by their **long** name, symbolised. Shortcuts never
+  appear in the result.
+- `SOPT.consume` returns the current options *and* keeps them in
+  `GOT_OPTIONS`; the two objects are not the same object, and `GOT_OPTIONS`
+  is the one that survives later `SOPT.reset` calls.
 
-SOPT generates usage documentation from declared options:
+## Where to go next
 
-```ruby
-puts SOPT.usage
-# Output:
-# -f--file* Input file
-# -o--output Output path
-# -v--verbose Verbose mode
-```
-
-### Resetting options
-
-If you need to re-define options (e.g., in tests):
-
-```ruby
-SOPT.reset
-```
-
-This clears all registered options.
-
-### Extracting specific options
-
-You can consume only specific options from ARGV:
-
-```ruby
-# Parse only file and output
-options = SOPT.get inputs: [:file, :output]
-```
-
-### Getting option info
-
-SOPT stores metadata about each option:
-
-```ruby
-SOPT.inputs              # => ["file", "output", "verbose"]
-SOPT.input_types[:file]  # => :string
-SOPT.input_types[:verbose] # => :boolean
-SOSOPT.input_descriptions[:file] # => "Input file"
-SOPT.input_defaults[:file] # => nil
-```
-
-## Common mistakes
-
-### Forgetting to parse
-
-```ruby
-# SOPT.parse only DEFINES options; it does NOT parse ARGV
-SOPT.parse "-f--file* Input file"
-
-# You must call consume to extract values
-options = SOPT.consume
-```
-
-### Short form collisions
-
-If two options want the same short form, SOPT will warn. You can let SOPT
-auto-pick a short form by passing `nil` or `true`:
-
-```ruby
-# Let SOPT pick a unique short form
-SOPT.register(nil, "force", nil, "Force overwrite")
-```
-
-### Not handling missing options
-
-```ruby
-# Boolean options default to false when not provided
-# String options default to nil when not provided
-options = SOPT.consume
-if options[:verbose]
-  Log.severity = 0
-end
-```
-
-## See also
-
-- [Annotating Data](AnnotatingData.md) — SOPT uses IndiferentHash for
-  parsed options.
+- [StartHere](../StartHere.md)
+- [Logging and Progress](LoggingAndProgress.md) — `Log.warn` used by the
+  boolean heuristic.
+- [Architecture](../developer/Architecture.md) — which repos own the
+  higher-level CLI layers (attribution table).

@@ -1,220 +1,202 @@
 # Annotating Data
 
-This guide explains how to attach metadata to objects in scout-essentials.
-You'll learn about annotations, named arrays, and key-indifferent hashes —
-three tools that make data manipulation more expressive without sacrificing
-compatibility with standard Ruby.
+Annotations attach named metadata — an organism, a provenance URL, a
+"kind" of file — to ordinary Ruby objects (Strings, Arrays, Hashes) without
+changing their class or wrapping them. This page is the user-facing view of the
+system; internals and design notes are in
+[Annotation System](../developer/AnnotationSystem.md).
 
-## When to use this
+Every example below was run against the current `lib/scout/` (probes
+P36–P42 in `research/behavior-probes.md` plus
+`tmp/rewrite_C/probe_01..04.rb` and `probe_09_annotated_array.rb`).
 
-- You need to attach metadata to a String, Array, or Hash without changing
-  its type.
-- You want array elements accessible by name (like a struct or tuple).
-- You're tired of `hash[:key]` vs `hash["key"]` errors.
-
-## Concepts
-
-### Annotations
-
-An annotation is a set of named attributes attached to an object. The object
-keeps its original class — an annotated String is still a String — but gains
-accessor methods for the annotation attributes.
+## Defining an annotation
 
 ```ruby
-module SampleMetadata
+module SampleInfo
   extend Annotation
   annotation :organism, :tissue, :donor
 end
 
-sample = "S001"
-SampleMetadata.setup(sample, organism: "Human", tissue: "Liver")
+sample = SampleInfo.setup('S003', organism: 'Human', tissue: 'Liver')
 
-sample            # => "S001" (still a String)
-sample.organism   # => "Human"
-sample.tissue     # => "Liver"
-sample.donor      # => nil
+sample                 # => "S003"      (still a String)
+sample.organism        # => "Human"
+sample.tissue          # => "Liver"
+sample.is_a?(String)   # => true
+sample.is_a?(SampleInfo) # => true      (the module really was extended in)
 ```
 
-### Named arrays
+`require 'scout-essentials'` is enough: `Annotation` arrives via
+`scout/path` (`lib/scout/path.rb:1`).
 
-A named array is an Array where each position has a name. You can access
-elements by position or by name.
+## The object you get back
+
+`setup` **extends the object you pass, in place**, and returns that same
+object — the call is an annotation, not a conversion:
 
 ```ruby
-values = NamedArray.setup([42, "active", 3.14], [:count, :status, :score])
-
-values[0]      # => 42        (by position)
-values[:count] # => 42        (by name)
-values["status"] # => "active" (string key works too)
-values.count   # => 42        (method access)
-
-values.to_hash # => {count: 42, status: "active", score: 3.14}
+name = 'S003'
+annotated = SampleInfo.setup(name, organism: 'Human')
+annotated.equal?(name)   # => true
 ```
 
-### Key-indifferent hashes
+Two consequences, both live-probed (probe_02):
 
-An IndiferentHash is a Hash where string and symbol keys are interchangeable.
+- a **frozen** object is `dup`ed first, so `setup` returns a different,
+  unfrozen copy — always use the return value;
+- `dup` of an annotated object **loses the annotations** (`SampleInfo ===
+  sample.dup => false`); `clone` keeps them (`SampleInfo === sample.clone =>
+  true` — `clone` copies the singleton class, `dup` does not). To copy
+  metadata onto a `dup` explicitly:
 
 ```ruby
-h = IndiferentHash.setup({a: 1, "b" => 2})
-
-h[:a]   # => 1
-h["a"]  # => 1
-h[:b]   # => 2
-h["b"]  # => 2
+copy = SampleInfo.setup(sample.dup, sample.annotation_hash)
+# or: sample.annotate(other_object)
 ```
 
-## Creating annotation modules
+`obj.dup` on an `Integer`-like target is different: `setup` rescues the
+`TypeError: can't define singleton` and hands back the plain, un-annotated
+object — nothing raises.
 
-Define a module, extend it with `Annotation`, and declare attributes:
+## Introspection
 
 ```ruby
-module JobInfo
-  extend Annotation
-  annotation :name, :status, :cpu_time
-end
+sample.annotation_types      # => [SampleInfo]      (module objects, not names)
+sample.annotation_types.include?(SampleInfo)   # => true
+
+SampleInfo.annotations       # => [:organism, :tissue, :donor]   (module state)
+
+sample.annotation_hash       # => {:organism=>"Human", :tissue=>"Liver"}
+sample.annotation_info       # => {..same.., :annotation_types=>[SampleInfo],
+                             #     :annotated_array=>false}
+sample.annotation_id         # => "860c73f490edb8115064663b7f579d73"
+Annotation.is_annotated?(sample)  # => true
 ```
 
-You can add more attributes later:
+Note where each thing lives: `annotation_types` is on the **object**; the
+declared attribute list is read from the **module** with `.annotations`
+(there is no `ANNOTATIONS` constant).
+
+### Round-trip
+
+`annotation_hash` plus `Annotation.setup` is the serialisation pair:
 
 ```ruby
-JobInfo.annotation :memory  # adds the :memory accessor
+info = sample.annotation_info
+Annotation.setup('S003', 'SampleInfo', sample.annotation_hash)
 ```
 
-## Applying annotations
+The type argument may be a `"A|B"` String of module names (unknown names are
+only `Log.warn`ed and skipped, probe_01) or an Array of module objects.
 
-### To a single object
+`#serialize` produces the plain Hash (`annotation_info` merged with
+`:literal`) consumed by the `:annotation` persistence driver. There is **no
+TSV serialisation of annotations in this repo** — `Annotation.tsv` /
+`Annotation.load_tsv` live in scout-gear (see the attribution table in
+[Architecture](../developer/Architecture.md)).
+
+Nested values you store are left alone: hashes stay plain `Hash`, they are
+**not** converted to `IndiferentHash`, and `deep_indifferent` does not exist
+in this gem.
+
+## NamedArray — field names over Array positions
+
+`NamedArray` (`lib/scout/named_array.rb`) is a separate annotation module
+that gives an Array named fields. It needs its **explicit**
+`require 'scout/named_array'` — `scout-essentials.rb` does not load it
+(probe_03):
 
 ```ruby
-obj = "my_job"
-JobInfo.setup(obj, name: "analysis", status: :running)
-obj.name    # => "analysis"
-obj.status  # => :running
+require 'scout/named_array'
+
+row = NamedArray.setup(%w[S003 Human Liver], %w[id organism tissue])
+row.organism    # => "Human"   (method_missing access)
+row[:organism]  # => "Human"
+row['tissue']   # => "Liver"
 ```
 
-You can also use positional values (they fill attributes in declaration order):
+Signatures (probe_04): `NamedArray.setup(array, names, *rest)` — the names are
+a positional Array, **not** a `key:` keyword.
+
+### Access is via `method_missing`
+
+Field accessors are *not* real methods, so they do not participate in the
+usual introspection:
 
 ```ruby
-JobInfo.setup(obj, "analysis", :running)
-obj.name    # => "analysis"
+row.respond_to?(:organism)          # => false
+row.methods.include?(:organism)     # => false
+row.organism                        # => "Human"   (still works)
 ```
 
-### To multiple objects at once
+`:[]` accepts a Symbol or a String and resolves through the field list
+(`identify_name`), so a field named like an Array method can still be reached
+positionally by name.
+
+### Array methods shadow field names
+
+If a field is called `first`, `last`, `count`, `zip`, `sample` … the real
+`Array` method wins (probe_10):
 
 ```ruby
-Annotation.setup(array, [JobInfo, OtherAnnotation], name: "x", other: "y")
+row2 = NamedArray.setup(%w[a b c], %w[first second third])
+row2.first       # => "a"      (Array#first, not the field)
+row2.first(2)    # => ["a", "b"]
+
+row3 = NamedArray.setup(%w[S001 S002 S003], %w[values count])
+row3.values      # => "S001"   (field: Array has no #values)
+row3.count       # => 3        (Array#count wins, not the field)
 ```
 
-### Checking annotations
+Note `values` — unlike `first`/`count` — is **not** an `Array` method, so the
+field accessor still works; `count` is real and wins. Prefer field names that
+are not `Array`/`Enumerable` verbs, or use `row[:name]` for ambiguous ones.
+
+`to_hash` (only available on `NamedArray`) returns an `IndiferentHash` of
+field → value.
+
+Watch out for `id` — `annotation_id` (aliased `id`) is defined by the
+annotation system itself, so a field named `id` collides and the digest is
+returned instead (probe_10).
+
+## `AnnotatedArray` — elements inherit the container's annotations
+
+Annotate the *container*, then `extend AnnotatedArray`, and every element
+handed out by `[]`, `first`, `last`, `each`, `collect`, `select`, `compact`,
+`uniq`, `flatten`, `reverse`, `sort_by`, `subset`, `remove` is re-annotated
+(probe_09):
 
 ```ruby
-obj.respond_to?(:status)  # => true
-obj.annotations         # => [:name, :status, :cpu_time]
-obj.respond_to?(:name)  # => true
+samples = SampleInfo.setup(%w[S001 S002 S003], organism: 'Human')
+samples.extend AnnotatedArray
+
+samples[0].organism    # => "Human"
+samples.each { |s| s.organism }
+samples.collect { |s| s.length }   # [4, 4, 4], elements annotated
+samples.select { |s| s != 'S002' } # re-annotated array
 ```
 
-## Named arrays in detail
+Not overridden — **annotations are dropped** (probe_09, method owners are
+`Array`/`Enumerable`): `map`, `zip`, `+`, `filter_map`, `flat_map`,
+`each_slice`, `values_at`. `zip` in particular does not propagate annotations
+to the *other* operand's elements.
 
-### Creating named arrays
+`[index]` re-annotates; `[index, true]` (the clean second argument) returns the
+raw element with no annotations (`lib/scout/annotation/array.rb:21-25`).
 
-```ruby
-# With field names
-arr = NamedArray.setup([1, 2, 3], [:x, :y, :z])
+Two hard limits:
 
-# With field names and a key (primary field)
-arr = NamedArray.setup([1, 2, 3], [:x, :y, :z], key: :x)
-```
+- elements must be extendable: an Array of `Integer`s raises `TypeError: can't
+  define singleton`;
+- `#make_array` does **not** annotate the elements — it wraps `self` in a
+  one-element annotated Array (see
+  [Annotation System](../developer/AnnotationSystem.md)).
 
-### Accessing by name
+## Related
 
-```ruby
-arr[:y]       # => 2
-arr["z"]      # => 3
-arr.y         # => 2
-```
-
-### Converting to hash
-
-```ruby
-arr.to_hash   # => IndiferentHash { :x => 1, :y => 2, :z => 3 }
-```
-
-### Iterating with names
-
-Named arrays support annotation-aware operations. Standard Array methods
-like `each`, `map`, `select` work as expected. Some methods like `zip`,
-`collect`, and `[]` propagate annotations to results.
-
-## Key-indifferent hashes in detail
-
-### Creating
-
-```ruby
-h = IndiferentHash.setup({foo: 1})
-# or
-h = IndiferentHash.setup({ "foo" => 1 })
-```
-
-### Nested hashes
-
-Nested hashes are automatically set up:
-
-```ruby
-h = IndiferentHash.setup({ config: { port: 8080 } })
-h["config"]["port"]  # => 8080
-```
-
-### Merging
-
-```ruby
-h1 = IndiferentHash.setup({a: 1, b: 2})
-h2 = {b: 3, c: 4}
-
-h1.merge(h2)       # => {a: 1, b: 3, c: 4} (IndiferentHash)
-h1.deep_merge(h2)  # recursively merges nested hashes
-```
-
-### Case-insensitive variant
-
-If you need case-insensitive keys:
-
-```ruby
-h = CaseInsensitiveHash.setup({Format: "CSV"})
-h["format"]  # => "CSV"
-h[:FORMAT]   # => "CSV"
-```
-
-## Common mistakes
-
-### Forgetting to call `setup`
-
-```ruby
-# WRONG: extend alone doesn't initialize attributes
-obj = "test"
-obj.extend(JobInfo)
-obj.name  # => nil (or error: attribute not initialized)
-
-# RIGHT: use setup
-JobInfo.setup(obj, name: "test")
-obj.name  # => "test"
-```
-
-### Assuming annotation changes the class
-
-```ruby
-metadata = SampleMetadata.setup("S001", organism: "Human")
-metadata.class  # => String (not SampleMetadata)
-metadata + "!"  # => "S001!" (String operations still work)
-```
-
-### Modifying a frozen object
-
-If the target object is frozen, `setup` duplicates it first. The original
-remains frozen and unchanged.
-
-## See also
-
-- [Working with Files](WorkingWithFiles.md) — Path objects are annotated
-  strings.
-- For internal implementation details, see
-  [Annotation System](../developer/AnnotationSystem.md).
+- [Annotation System](../developer/AnnotationSystem.md) — internals, limits,
+  serialisation drivers.
+- [Path Resolution](../developer/PathResolution.md) — `Path` is an annotated
+  module.
+- [Caching Results](CachingResults.md) — the `:annotation` persistence type.

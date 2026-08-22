@@ -1,290 +1,217 @@
 # Working with Files
 
-This guide explains how to read, write, and resolve files in scout-essentials.
-You'll learn about the Open module for I/O, the Path module for resolution,
-and TmpFile for temporary files.
+This guide explains how to read, write, and manage files in scout-essentials:
+the `Open` module for I/O, compression, grepping, atomic writes, locking, and
+remote file handling, plus `TmpFile` for scratch space.
 
-## When to use this
-
-- You need to read or write files, including compressed (`.gz`, `.bgz`,
-  `.zip`) and remote files.
-- You want logical path names to resolve to physical locations across
-  configurable search directories.
-- You need atomic, concurrency-safe file writes.
-
-## Concepts
-
-### Open: unified file I/O
-
-The Open module provides a single interface for reading and writing files,
-regardless of whether they are local, compressed, or remote.
+## Reading: `Open.read` and `Open.open`
 
 ```ruby
-# Read a plain file
-content = Open.read("data.txt")
+require 'scout-essentials'
 
-# Read a gzip file (transparent decompression)
-content = Open.read("data.txt.gz")
+Open.read('VERSION')             # => "1.8.8"     (UTF-8 fixed by default)
+Open.read('VERSION', nofix: true) # => raw bytes as read
 
-# Write a file (creates parent dirs automatically)
-Open.write("output/result.txt", "hello")
+Open.open('data.txt') do |f|
+  f.each_line { |line| ... }
+end
+
+Every stream returned by `Open.open` is extended with `Open::NamedStream`,
+whose `filename` attribute records the file it was opened from (useful when
+the stream flows through pipelines):
+
+```ruby
+io = Open.open('data.txt')
+io.filename # => "data.txt"
 ```
 
-### Path: logical-to-physical resolution
+- `Open.read`/`Open.open` accept a `Path` (or a `String`); a `Path` is
+  resolved with `find` before opening.
+- Both accept options. Notable ones:
+  - `:mode` — open mode (`'r'` default, `'rb'` for binary reads).
+  - `:grep` / `:invert_grep` — filter lines while reading (below).
+  - `:zip` / `:gzip` / `:bgzip` — force a decompressor regardless of
+    extension.
+  - `:noz` — disable automatic decompression and read the raw file.
 
-Path objects are strings that know how to resolve themselves across a
-configured set of search directories called "path maps."
+## Compression
+
+Detection is **extension-only and case-sensitive**. A file is decompressed
+only when its name ends (lower-case) with `.gz`, `.bgz`, `.zip`:
 
 ```ruby
-# A Path is just a String with resolution behavior
-path = Path.setup("data/config.yaml")
-
-# find returns the first existing file across search directories
-resolved = path.find
+Open.read('file.gz')    # decompressed
+Open.read('file.GZ')    # raw gzip bytes — NOT detected
+Open.read('file.tgz')   # raw gzip bytes — NOT detected
+Open.read('file.tar.gz')# decompressed (ends in .gz)
+Open.read('file.gz.bak')# raw gzip bytes — NOT detected
+Open.gzip?('file.tgz')  # => false
 ```
 
-### TmpFile: temporary files and directories
-
-TmpFile creates temporary files and directories, with automatic cleanup.
+Force decompression explicitly when the name does not cooperate:
 
 ```ruby
-TmpFile.with_file do |tmp|
-  Open.write(tmp, "temporary content")
-  process(tmp)
-end  # tmp is deleted after the block
+Open.open('file.tgz', :gzip => true).read
 ```
 
-## Reading files
+## Grepping lines
 
-### Simple read
+`:grep` and `:invert_grep` select lines using the system `grep`. **With a
+block**, `Open.read` collects the transformed lines into an Array; **without
+a block** it returns the matched lines as a String (and `Open.open` returns
+a grep pipe):
 
 ```ruby
-content = Open.read("data.txt")
-lines = content.split("\n")
+# file f contains: apple / banana / cherry
+Open.read(f, grep: 'an')                 # => "banana\n"   (String)
+Open.read(f, grep: 'an') { |l| l.strip.upcase } # => ["BANANA"]
+Open.read(f, grep: 'an', invert_grep: true)     # => "apple\ncherry\n"
+Open.read(f, grep: %w(apple banana)) { |l| l.strip } # => ["apple", "banana"]
 ```
 
-### Reading line by line
+**`invert_grep` has no effect on its own.** `Open.read`/`Open.open` only
+grep when `grep` is truthy (`Open#file_open(file, grep = false, ...)`
+extracts `:grep`/`:invert_grep` but only greps for `grep`); passing
+`invert_grep:` without `grep:` returns the whole file unchanged:
 
 ```ruby
-Open.read("data.txt") do |line|
-  puts line
+Open.read(f, invert_grep: 'an')          # => "apple\nbanana\ncherry\n" (no-op)
+```
+
+To invert without going through `:grep`, use the low-level helper with its
+third argument:
+
+```ruby
+Open.grep(Open.open(f), 'an', true).read # => "apple\ncherry\n"
+```
+
+`:grep` accepts a String (passed to the system `grep` as a pattern) or an
+Array of Strings (written to a pattern file used with `grep -f`). Arrays are
+matched with `grep -w -F` (whole-word, fixed strings) unless you pass
+`fixed_grep: false`, which switches to plain `grep -f` semantics.
+
+## Writing: `Open.write` and appends
+
+```ruby
+Open.write('out.txt', "content\n")       # creates parent dirs
+Open.write('out.txt') { |f| f.puts "x" } # block form
+```
+
+`Open.write` always overwrites by default (`mode: 'w'`). **To append, pass
+`mode: 'a'`** — there is no public `Open.append` class method:
+
+```ruby
+Open.write('log.txt', "one\n")
+Open.write('log.txt', "two\n", mode: 'a')
+Open.read('log.txt') # => "one\ntwo\n"
+```
+
+On error, `Open.write` removes the partially written file and re-raises.
+
+### Atomic writes: `sensible_write`
+
+`Open.sensible_write(file, content = nil, options = {})` refuses to overwrite
+an existing file unless `:force => true`; it takes a String or a block and
+removes the target when the block raises (`Aborted` is swallowed silently):
+
+```ruby
+Open.sensible_write(path, "v1")
+Open.sensible_write(path, "v2")            # keeps "v1"
+Open.sensible_write(path, "v2", force: true) # overwrites
+```
+
+## File primitives
+
+All of these accept `Path` or `String` and resolve `Path`s via `find`; most
+create parent directories as needed:
+
+| Call | Effect |
+|---|---|
+| `Open.cp(src, dst)` | `cp_r`, creates parent dirs, replaces `dst` |
+| `Open.mv(src, dst)` | two-step move (`.tmp_mv.` intermediate), creates parent dirs |
+| `Open.rm(file)` | removes a file or broken link |
+| `Open.rm_rf(file)` | recursive remove |
+| `Open.mkdir(dir)` | `mkdir -p` if missing |
+| `Open.mkfiledir(file)` | `mkdir -p` the parent of `file` |
+| `Open.touch(file)` | `touch`, creating parent dirs |
+| `Open.ln(src, dst)` | hard link (falls back to `ln_s` via `Open.link`) |
+| `Open.ln_s(src, dst)` | symbolic link |
+| `Open.ln_h(src, dst)` | `ln -L` with `cp -L` fallback |
+| `Open.link(src, dst)` | `Open.ln`, falling back to `Open.ln_s` |
+| `Open.link_dir(src, dst)` | `cp -lr` — copy a directory tree of hard links |
+| `Open.same_file(a, b)` | `File.identical?` |
+| `Open.exists?(f)`, `Open.directory?(f)`, `Open.size(f)`, `Open.ctime(f)`, `Open.mtime(f)` | stats |
+
+```ruby
+src = 'data/src.txt'
+Open.write(src, 'S')
+Open.cp(src, 'data/sub/dst.txt')           # parents created
+Open.mv('data/sub/dst.txt', 'data/m.txt')
+Open.touch('data/t/t.txt')
+Open.ln(src, 'data/hard.txt')              # nlink > 1
+Open.link_dir('data/a', 'data/a2')
+Open.same_file(src, 'data/hard.txt')       # => true
+```
+
+`Open.mtime` has one special case: for a symlink or a file with multiple
+hard links it consults a sibling `.info` file when `Step` is defined (a
+scout-gear concept) and falls back to `Pathname#realpath`; otherwise it is a
+plain `File.mtime`.
+
+## Locking: `Open.lock`
+
+```ruby
+Open.lock('var/cache/persistence/file') do
+  # exclusive access while the block runs
 end
 ```
 
-### Reading compressed files
+`Open.lock(file, unlock = true, options = {})` uses the vendored `Lockfile`
+implementation. The lock file lives next to the target by default; pass a
+`Lockfile` instance via `options[:lock]` to reuse an existing one. See
+[Caching Results](CachingResults.md) for how `Persist` uses it.
 
-Open automatically detects `.gz`, `.bgz`, and `.zip` extensions and
-decompresses transparently:
+## Streams and `consume_stream`
 
-```ruby
-content = Open.read("data.tsv.gz")  # same as reading uncompressed
-```
+`Open.open_pipe` returns a `ConcurrentStream` that you can consume lazily;
+`Open.consume_stream(stream)` reads it to the end (and joins it), and
+`Open.sensible_write` accepts a stream, writing it asynchronously. When a
+stream carries a `filename`, `NamedStream` records it so tools can recover
+the original name. See
+[Streaming Model](../developer/StreamingModel.md).
 
-If you want to read compressed content without decompression, pass `noz:
-true`:
+## Remote files
 
-```ruby
-raw = Open.read("data.tsv.gz", noz: true)
-```
+`Open.read`/`Open.open` transparently handle `http(s)://` and `ssh:` URLs by
+shelling out (`Open.wget`, `Open.ssh`), and `Open.sync` / `Open.rsync` copy
+remote trees into the local cache (`Open.remote_cache_dir`, default
+`$HOME/.scout/var/cache/open-remote`). Remote fetching is covered in
+[RemoteData.md](RemoteData.md).
 
-### Reading remote files
-
-Open supports URLs and SSH paths:
-
-```ruby
-# HTTP/HTTPS
-content = Open.read("https://example.com/data.txt")
-
-# SSH (if Open.ssh is configured)
-content = Open.read("user@host:/path/to/file")
-```
-
-### Filtering while reading
+## Scratch files: `TmpFile`
 
 ```ruby
-# Only lines matching a pattern
-Open.read("data.txt", grep: "interesting") do |line|
-  puts line
-end
-
-# Exclude lines matching a pattern
-Open.read("data.txt", invert_grep: "comment")
+TmpFile.tmp_file('prefix')     # => ".../tmpfiles/tmp-<n>" (a fresh path)
+TmpFile.user_tmp               # => $HOME/tmp/scout
+TmpFile.tmp_for_file('a/b/c')  # => "·a·b·c" (flat, separators replaced with ·)
+TmpFile.with_file(content) do |file| ... end   # writes, yields the path, removes it
+TmpFile.with_dir do |dir| ... end
 ```
 
-## Writing files
+`TmpFile.tmp_for_file` flattens the whole path into a single file name
+inside the tmpfiles directory (`/` → `·`), it does **not** create a nested
+directory structure; `TmpFile.tmp_for_dir` does not exist. Options may
+append a `[key]` and an `&F[...]` fingerprint, and names are truncated to
+`MAX_FILE_LENGTH` (150).
 
-### Simple write
+## Related
 
-```ruby
-Open.write("output/result.txt", "content here")
-```
-
-### Writing with a block
-
-```ruby
-Open.open("output/result.txt", mode: 'w') do |io|
-  io.puts "line 1"
-  io.puts "line 2"
-end
-```
-
-### Streaming content from an IO
-
-```ruby
-source = CMD.cmd("generate_data", pipe: true)
-Open.write("output/data.txt", source)
-```
-
-### Atomic writes
-
-For concurrency-safe writes, use `sensible_write`:
-
-```ruby
-Open.sensible_write("output/result.txt", content)
-```
-
-This writes to a temporary file first, then moves it into place, preventing
-partial reads by other processes.
-
-## Path resolution
-
-### Creating a Path
-
-```ruby
-path = Path.setup("data/config.yaml")
-
-# Path objects are also created by Resource modules
-path = MyResource.data.config  # builds hierarchical paths
-```
-
-### Building paths fluently
-
-```ruby
-base = Path.setup("/project")
-base.data.samples          # => "/project/data/samples"
-base / :config / :default  # => "/project/config/default"
-base[:results, :final]     # => "/project/results/final"
-```
-
-### Finding files
-
-```ruby
-path = Path.setup("data/config.yaml")
-path.find        # => first existing match across search maps
-path.find_all    # => all existing matches
-path.located?    # => true if path is absolute (starts with / ~ or ./)
-```
-
-### Path maps
-
-Path maps are templates that define where to look for files. The default
-maps include: `current`, `user`, `global`, `cache`, `tmp`, `lib`, and more.
-
-```ruby
-# View configured maps
-Path.path_maps.keys  # => ["current", "user", "global", ...]
-
-# Add a custom map
-Path.add_path(:my_location, "/custom/dir/{PATH}")
-Path.prepend_path(:my_location, "/priority/{PATH}")
-
-# Override map order
-Path.map_order = [:current, :my_location, :user, :global]
-```
-
-Map templates can use placeholders:
-- `{PATH}` — the logical path
-- `{PKGDIR}` — package directory
-- `{SUBPATH}` — sub-path within package
-- `{HOME}`, `{PWD}`, `{TOPLEVEL}` — standard locations
-
-### Checking existence
-
-```ruby
-path = Path.setup("data/config.yaml")
-path.exists?           # => true if file exists at resolved location
-path.exists?(produce: true)  # => triggers production if Resource-backed
-
-# Alternative extensions are checked automatically
-path.find  # checks .gz, .bgz, .zip alternatives
-```
-
-## Temporary files
-
-### Temporary files with automatic cleanup
-
-```ruby
-# Create, use, and delete
-TmpFile.with_file do |tmp|
-  Open.write(tmp, "data")
-  process(tmp)
-end
-
-# Pre-populate with content
-TmpFile.with_file("initial content") do |tmp|
-  process(tmp)
-end
-
-# Keep the file after the block
-TmpFile.with_file("content", false) do |tmp|
-  process(tmp)
-end  # tmp is NOT deleted
-```
-
-### Temporary directories
-
-```ruby
-TmpFile.with_dir do |dir|
-  # dir is a temporary directory
-  Open.write(File.join(dir, "file1"), "a")
-  Open.write(File.join(dir, "file2"), "b")
-end  # dir is deleted
-```
-
-### Generating temporary paths without blocks
-
-```ruby
-tmpfile = TmpFile.tmp_file     # => "/home/user/tmp/scout/tmpfiles/tmp-12345"
-tmpdir = TmpFile.tmp_for_dir   # => a temporary directory path
-```
-
-## Common mistakes
-
-### Forgetting that Open.read handles compression
-
-```ruby
-# WRONG: manual decompression
-content = `gunzip -c data.gz`
-
-# RIGHT: Open handles it
-content = Open.read("data.gz")
-```
-
-### Not using atomic writes for shared files
-
-```ruby
-# RISKY: other processes may read a partial file
-File.write("shared.txt", "content")
-
-# SAFE: atomic write
-Open.sensible_write("shared.txt", "content")
-```
-
-### Confusing Path#find with file existence
-
-```ruby
-# find returns the resolved path or nil; it does NOT return a boolean
-path = Path.setup("missing_file")
-path.find  # => nil (not false)
-
-# Use exists? for boolean checks
-path.exists?  # => false
-```
-
-## See also
-
-- [Caching Results](CachingResults.md) — Persist uses Open for atomic writes.
+- [Caching Results](CachingResults.md) — `Persist` uses `Open.lock` and
+  `sensible_write`.
+- [Path Resolution](../developer/PathResolution.md) — `find`/`follow`, path
+  maps.
 - [Producing Resources](ProducingResources.md) — Resource uses Path for
   resolution.
-- For path map internals, see
-  [Path Resolution](../developer/PathResolution.md).
+- For streaming internals, see
+  [Streaming Model](../developer/StreamingModel.md).
+- For remote data, see [RemoteData.md](RemoteData.md).

@@ -1,397 +1,218 @@
 # Running Commands
 
-This guide explains how to execute external commands in scout-essentials
-using the CMD module. You'll learn about basic execution, streaming,
-piping, tool management, and error handling.
+`CMD` is scout-essentials' subprocess layer: one entry point, `CMD.cmd`, that
+covers shell commands, no-shell command arrays, stdin piping, timeouts, stderr
+handling and external-tool bootstrap. This page documents what the code does
+(`lib/scout/cmd.rb`); for the object `:pipe => true` hands back, see
+[Handling Streams](HandlingStreams.md) and the
+[Streaming Model](../developer/StreamingModel.md).
 
-CMD supports two ways to specify a command: as a **String** (interpreted by
-a shell, for flexibility) or as an **Array** of arguments (executed
-directly, for safety). Both forms share the same lifecycle, streaming, and
-error-handling tooling. Choosing between them is a recurring theme in this
-guide.
+## Command forms
 
-## When to use this
-
-- You need to run shell commands and capture their output.
-- You want to stream command output to another command (pipelines).
-- You need to discover and manage external tools (e.g., via conda).
-- You want robust error handling for subprocess failures.
-- You are building commands from variable or untrusted input and want to
-  avoid shell injection (use the Array form).
-
-## Concepts
-
-### CMD: command execution with lifecycle management
-
-The CMD module wraps `Open3.popen3` to run external commands. It handles
-pipe creation, stdin feeding, stderr logging, process lifecycle, and error
-propagation.
+`CMD.cmd(tool, cmd, options)` accepts three shapes:
 
 ```ruby
-# Simple command — returns StringIO with collected output
-out = CMD.cmd("echo hello")
-out.read  # => "hello\n"
+CMD.cmd('echo hello').read            # => "hello\n"  (String: run by a shell)
+CMD.cmd(['echo', 'array-form']).read             # => "array-form\n"
+CMD.cmd('echo', 'arg2', '-n' => true, '-r' => true).read
 ```
 
-### Pipe mode vs blocking mode
+- **String** — `tool` alone, or `tool + ' ' + cmd` when both are given. The
+  string is handed to `Open3.popen3(ENV, cmd)`, so shell features work.
+- **Array** — no shell is involved; `Open3.popen3(ENV, *cmd_array)` is called
+  with the array plus each option as a separate argument. `process_cmd_options_array`
+  turns `'n' => 'val'` into `['n', 'val']` (or `['n=val']` for a key ending in
+  `=`), so quoting is not an issue here.
+- **Hash-only** (`CMD.cmd({'echo' => 'x'})`) is *not* a command form; the Hash is
+  treated as options, `cmd`/`tool` stay nil and the call fails.
 
-By default (`pipe: false`), CMD waits for the command to finish and returns
-a StringIO with all output collected. With `pipe: true`, CMD returns a
-stream immediately that you read from while the command runs.
+Verified: probe `tmp/rewrite_B/probe_15_cmd_forms.rb` (string, string+cmd,
+array, array+string, symbol tool with nil cmd, ProcessFailed on hash-only).
+
+### The `'{opt}'` placeholder
+
+In String form the processed options are substituted for the literal
+placeholder `'{opt}'` **only when it is single-quoted** in the command string:
 
 ```ruby
-# Blocking mode (default): wait for completion
-out = CMD.cmd("wc -l file.txt")
-out.read  # => "1234 file.txt\n"
+CMD.cmd("cut -d' ' -f2 '{opt}'", '-n' => true, in: 'one two three').read
+# => "two\n"        options replaced the quoted placeholder
 
-# Pipe mode: stream while running
-stream = CMD.cmd("generate_data", pipe: true)
-stream.each_line { |line| process(line) }
-stream.join  # wait for completion and check exit status
+CMD.cmd("echo {opt} a 1", 'x' => 1).read   # => "{opt} a 1\n"
+CMD.cmd("echo '{opt}' a 1", 'x' => 1).read # => "a 1\n"  (note: trailing space)
 ```
 
-### String form vs Array form
+Unquoted `{opt}` is left untouched — the substitution matches `'\{opt\}'`
+exactly. Without a placeholder the option string is appended to the command.
+Verified: probe `probe_14_cmd_opts.rb` lines 10-11 and the C8 fix in
+`research/doc_audit/RunningCommands.md`.
 
-CMD accepts the command in two forms. All other options (stdin, pipe mode,
-error handling, etc.) work identically in both.
+## Option quoting: `process_cmd_options`
 
-| Form | First argument | Shell | Typical use |
-|------|---------------|-------|-------------|
-| **String** | `"echo hello"` | Yes — interpreted by `/bin/sh` | Pipes, redirects, globbing, variable expansion |
-| **Array** | `["echo", "hello"]` | No — passed directly to `execve` | Commands built from variable or untrusted input |
+Every option that is not one of the reserved keys below becomes part of the
+command line. `CMD.process_cmd_options(options)` builds that string:
 
-The **String form** passes the command through a shell. This means shell
-features like pipes (`|`), redirects (`>`), globbing (`*.txt`), variable
-expansion (`$HOME`), and command substitution are available. It is the
-right choice when you need these features or when the command is a fixed
-literal.
+| option/value | result |
+|---|---|
+| `'opt' => true` | `opt` (bare flag, no value) |
+| `'-v' => 'V'` | `-v 'V'` |
+| `'-v=' => 'V'` | `-v='V'` (key ends in `=`: value glued, still quoted) |
+| `'opt' => nil`, `'opt' => false` | dropped |
+| value containing `'` | `\'`-escaped, then wrapped in `'...'` |
+| `:add_option_dashes => true` | prepends `--` to keys not already starting with `-` |
 
-The **Array form** passes each element as a separate argument directly to
-the operating system's `exec` call — no shell is involved. This means
-special characters such as `;`, `|`, `>`, `$`, spaces, and backticks are
-treated as literal data, not as shell metacharacters. It is the right
-choice when any part of the command comes from user input, external data,
-or variables, because it eliminates the risk of shell injection.
+The quoting rule is uniform: the value is always wrapped in single quotes, and
+a value containing an apostrophe has it backslash-escaped first. There is no
+"spaces only" special case.
+
+**Key validation**: an option key that does not match `/^[a-z_0-9\-=.]+$/i`
+raises `Invalid option key` before anything runs.
+
+**Arrays are not expanded.** An Array value is stringified (`to_s`) and quoted
+like any other value — `"#{value}"` produces `n '["a", "b"]'` in String mode
+and `['n', '["a", "b"]']` in array mode. Pass separate calls or build the
+command yourself if you need repeated flags. Verified: `probe_14_cmd_opts.rb`
+lines 4-5 and the cmd-level Array check.
+
+Verified examples: `probe_14_cmd_opts.rb` (dashes, `=`, nil/false, true,
+apostrophes, invalid key, arrays).
+
+## stderr: severities, capture and files
+
+`options[:stderr]` selects how the child's stderr is treated. The default
+(added by `cmd.rb:181`) is **`Log::DEBUG`** — stderr lines are only logged at
+debug severity, i.e. invisible unless you raise `Log.severity` above it.
+
+- `:stderr => true` is normalised to `Log::HIGH` (probe `probe_23_bar_log.rb`).
+- Any other Integer is a `Log` severity: the ladder is
+  `DEBUG=0, LOW=1, MEDIUM=2, HIGH=3, INFO=4, WARN=5, ERROR=6, NONE=7`
+  (`lib/scout/log.rb` `SEVERITY_NAMES`), so `:stderr => Log::MEDIUM` shows
+  stderr as warnings while staying quieter than `HIGH`.
+- Log output itself goes to the Log logfile / STDERR (see the
+  [Streaming Model](../developer/StreamingModel.md) for what per-stream capture
+  means); the per-command stderr *text* is never attached to the stream.
+
+### `:save_stderr` — capture stderr instead of logging it
+
+`ee24c68` extended `:save_stderr` to three shapes. All of them also fill the
+`std_err` attribute (String on non-pipe results, on the returned stream in pipe
+mode), so you can inspect it after the fact:
+
+- **`:save_stderr => true`** — the text is captured into `std_err` and nothing
+  is logged.
+- **`:save_stderr => path`** (String, Scout `Path` or `Pathname`) — CMD opens
+  the path for writing (truncating), **creates missing parent directories**,
+  writes stderr to it **line-buffered** so `tail -f` can follow a running
+  command, and **closes it when the command ends**. `std_err` is populated too.
+- **`:save_stderr => io`** (anything responding to `write`/`<<`) — every chunk
+  is written and flushed, but CMD **never closes it**; closing is the caller's
+  business. `std_err` is populated too.
 
 ```ruby
-# String form — shell interprets special characters
-CMD.cmd("echo $HOME").read    # => "/home/user\n"  (variable expanded)
-
-# Array form — everything is literal
-CMD.cmd(["echo", "$HOME"]).read   # => "$HOME\n"    (literal, not expanded)
+res  = CMD.cmd('sh -c "echo err >&2; echo out"', :save_stderr => true)
+res2 = CMD.cmd(..., :save_stderr => 'log/cmd.err')   # nested dirs created
+dst  = File.open('err.txt', 'w')
+CMD.cmd(..., :save_stderr => dst)                     # dst stays open
 ```
 
-## Basic usage
+Implementation: `cmd.rb:194-217` (destination setup), the writer thread /
+inline writer, and the `ensure` at `cmd.rb:600-612` that flushes and closes a
+CMD-owned file. Verified by `test/scout/test_cmd_save_stderr.rb` (13 tests,
+incl. live `tail -f` polling) and probes `probe_17_save_stderr.rb`
+(boolean/String/Path/Pathname/IO/StringIO, pipe and non-pipe, truncation) and
+`probe_16_exitstatus.rb` (`std_err` populated in both modes).
 
-### Running a command and capturing output
+## Exit status, `no_fail` and failure
 
-```ruby
-# String form
-result = CMD.cmd("date +%Y-%m-%d").read
-# => "2024-01-15\n"
+- Non-pipe mode: `CMD.cmd(...)` waits for the child and raises
+  `ProcessFailed` when the exit status is non-zero, unless `:no_fail` (alias
+  `:nofail`) is given.
+- `:no_fail => true` **suppresses** `ProcessFailed`/`ConcurrentStreamProcessFailed`
+  — and `exit_status` then stays `nil`, in pipe mode too. If you need the code,
+  call `join_pids` yourself. Verified: `probe_16_exitstatus.rb`
+  (`pipe read+join exit_status: nil`, `explicit join_pids exit_status: 0`,
+  `non-pipe exit_status: 0`).
+- `exit_status` is only ever set by `ConcurrentStream#join_pids`
+  (`concurrent_stream.rb:127`), which also empties `pids`, so it can only be
+  used once. A stream that is read and joined normally has `exit_status == nil`
+  (probe `probe_26_join_es.rb`: `read+join: es=nil` with `joined?` true; only
+  an explicit early `join_pids` yields `0`). Do not rely on `stream.exit_status`.
+- If the process never starts (bad executable, no such file) `ProcessFailed` is
+  raised immediately — also suppressed by `no_fail`, which then returns `nil`.
+- A failed *producer thread* in pipe mode surfaces as
+  `ConcurrentStreamProcessFailed` when the consumer closes/joins the stream
+  (`probe_13_force_close.rb`).
 
-# Array form — same result, no shell
-result = CMD.cmd(["date", "+%Y-%m-%d"]).read
-# => "2024-01-15\n"
-```
+## Timeout
 
-### Array form (no shell)
+`CMD::Timeout < ProcessFailed` carries `command` and `timeout` and is raised by
+a watchdog when `:timeout => seconds` elapses (`cmd.rb:310-408`,
+`TIMEOUT_KILL_GRACE = 1.0`). This is the only way to bound a command's runtime.
 
-When the first argument is an Array, CMD executes the command without a
-shell. Each element becomes a single argument:
-
-```ruby
-# Simple echo
-CMD.cmd(["echo", "hello"]).read        # => "hello\n"
-
-# Multi-word argument stays as one argument (no quoting needed)
-CMD.cmd(["echo", "hello world"]).read  # => "hello world\n"
-
-# Special characters are literal — no injection risk
-CMD.cmd(["echo", "hello; rm -rf /"]).read   # => "hello; rm -rf /\n"
-CMD.cmd(["echo", "$HOME"]).read             # => "$HOME\n"
-```
-
-This is the recommended approach when command arguments come from
-untrusted or variable sources:
-
-```ruby
-# User-provided filename — safe with Array form
-filename = params[:filename]   # could contain spaces, ;, $, etc.
-CMD.cmd(["grep", pattern, filename]).read
-
-# Contrast: String form would be vulnerable to injection
-# CMD.cmd("grep #{pattern} #{filename}").read  # RISKY!
-```
-
-A String passed as the second argument is appended to the command array:
-
-```ruby
-CMD.cmd(["echo", "-n"], "hello").read  # => "hello" (no trailing newline)
-```
-
-### Passing options as a hash
-
-CMD can interpolate options into the command string using the `{opt}`
-placeholder, or append them at the end:
-
-```ruby
-# With {opt} placeholder in command
-CMD.cmd("sort '{opt}' file.txt", "-n" => true, "-r" => true)
-# runs: sort -n -r file.txt
-
-# Without {opt}: options appended
-CMD.cmd("cut -f 2 -d ' '", in: "a b c")
-```
-
-In Array form, options from the hash are converted to separate CLI
-arguments and appended to the command array (there is no `{opt}`
-placeholder — the options simply become additional elements):
-
-```ruby
-# Array form with options hash
-CMD.cmd(["cut"], "-f" => 2, "-d" => " ", in: "one two three").read
-# => "two\n"
-# runs: cut -f 2 -d ' '
-```
-
-### Feeding stdin
-
-```ruby
-# Feed a string as stdin (works in both forms)
-CMD.cmd("tr a-z A-Z", in: "hello\n").read         # => "HELLO\n"
-CMD.cmd(["tr", "a-z", "A-Z"], in: "hello\n").read  # => "HELLO\n"
-```
-
-## Streaming and pipes
-
-### Creating a stream
-
-```ruby
-# String form
-stream = CMD.cmd("seq 1 100", pipe: true)
-stream.read  # read some output
-stream.join  # wait for process to finish, raise on failure
-
-# Array form — identical behavior
-stream = CMD.cmd(["seq", "1", "100"], pipe: true)
-```
-
-### Piping one command into another
-
-```ruby
-# Generate data, pipe through filter, capture result
-producer = CMD.cmd("seq 1 10", pipe: true)
-filter = CMD.cmd("grep 5", in: producer, pipe: true)
-result = filter.read  # => "5\n"
-filter.join
-producer.join
-```
-
-Both forms can be mixed in a pipeline:
-
-```ruby
-producer = CMD.cmd(["seq", "1", "100"], pipe: true)  # Array form
-filter  = CMD.cmd("grep 50", in: producer, pipe: true) # String form
-filter.read  # => "50\n"
-filter.join
-producer.join
-```
-
-### Using autojoin
-
-When `autojoin: true` is set, the stream automatically joins producers when
-the consumer finishes reading (on EOF or close):
-
-```ruby
-stream = CMD.cmd("seq 1 100", pipe: true, autojoin: true)
-stream.read  # reading triggers join on EOF
-```
+- **Non-pipe mode**: the watchdog raises in the calling thread.
+- **Pipe mode**: the exception is routed through `ConcurrentStream#abort` — it
+  lands in `stream_exception`, the stream is aborted (killing the process,
+  clearing pids, unblocking a blocked reader) and is re-raised when the consumer
+  reads or joins. It is *not* raised directly in the caller at command start.
 
 ## Tool management
 
-CMD can discover and install tools through a registry:
+There is **no `CMD.add_tool`**. Registration is:
 
 ```ruby
-# Pass a symbol to trigger tool discovery
-CMD.cmd(:samtools, "view -bS input.sam")
-
-# Register a tool with installation instructions
-CMD.add_tool(:samtools, "conda install -c bioconda samtools")
+CMD.tool(:samtools, claim, test, cmd, &block)   # internally stored [claim, test, block, cmd]
+CMD.get_tool(:samtools)                          # ensures it is usable; returns the command name
+CMD.versions                                     # => {"samtools" => "1.17", ...}
+CMD.conda('samtools', 'env', 'bioconda')         # conda install fallback
+CMD.bash(cmd)                                    # bash -l login shell, :autojoin => true
+CMD.scan_version_text(text, 'samtools')          # heuristically pull a version string
+CMD.cmd_log('...')                               # run + echo STDOUT/STDERR, returns nil
+CMD.cmd_pid('...')                               # same implementation, also returns nil
+                                                 # (both force :pipe/:log; the pid only shows up
+                                                 #  inside the 'STDOUT [pid]:' header)
 ```
 
-When you pass a Symbol as the first argument, CMD checks if the tool is
-available. If not, it runs the registered installation command.
+`get_tool` runs `test` (or `command -v cmd`), and if that fails produces the
+`claim` Resource (or calls `block`; a Hash result is passed to
+`Resource.install`). It then records a version from `--version`/`-version`/
+`--help` output. Tools are stored in the `TOOLS` IndiferentHash; `versions`
+returns only entries matching `/\d+\./`.
 
-Tool management is only available in String form (or when using a Symbol).
-In Array form, the first element is always treated as a literal command
-name — no tool registry lookup occurs.
+## Options reference (consumed by `CMD.cmd`)
 
-## Error handling
+| key | effect |
+|---|---|
+| `:in` | stdin: a String is written by a thread; an IO/StringIO is read; a ConcurrentStream is streamed (and closed unless `:dont_close_in`). Also `:in_pipe` for a pipe-backed writer. Verified: `probe_25_keeping_in.rb` (String, IO, stream, `in_pipe` returns an IO). |
+| `:pipe` | return a ConcurrentStream instead of the text/StringIO |
+| `:stderr` | severity for stderr logging (default `Log::DEBUG`); `true` → `Log::HIGH` |
+| `:save_stderr` | `true` / path / IO — see above |
+| `:no_fail`, `:nofail` | suppress failure raising (both spellings) |
+| `:autojoin` | join the stream when it is closed/read; **`CMD.cmd` sets `:autojoin => no_fail`** |
+| `:no_wait` | alias used to default `autojoin` (`autojoin = no_wait if autojoin.nil?`) |
+| `:timeout` | seconds; watchdog; only runtime bound |
+| `:post` | proc run after the command/stream finishes (teardown, forcing upstream closes) |
+| `:progress_bar` | a `Log::ProgressBar`; stderr lines tick it (`probe_24_bar.rb`: 2 ticks in both pipe and non-pipe mode) |
+| `:log` | defaults to `true` (`log = true if log.nil?`, cmd.rb:224): pipe-mode stderr lines are `Log.log`ged at the chosen `:stderr` severity. `:log => false` silences that logging. Not the same as `CMD.cmd_log` (a separate helper that forces `:pipe`/`:log`). |
+| `:sudo`, `:xvfb` | prefix the command |
+| `:dont_close_in` | keep the `:in` stream open |
+| `:add_option_dashes` | passed through to `process_cmd_options*` |
 
-### Default: raise on failure
+`:wait`, `:canfail`, `:empty_inputs` and `:separator` are **not** options of
+`CMD.cmd` in this repo — `cmd.rb` deletes none of them, so they would be
+forwarded to `process_cmd_options` and end up as command-line text. `:canfail`
+exists on `Persist` (`persist.rb:133`) and on `Resource` claims, not here.
+Verified by grepping `lib/` for the four names (`probe_25_keeping_in.rb` tail).
 
-```ruby
-# String form
-begin
-  CMD.cmd("false")  # exits with status 1
-rescue ProcessFailed => e
-  puts "Command failed: #{e.message}"
-end
+## The block is ignored
 
-# Array form — identical error behavior
-begin
-  CMD.cmd(["false"])
-rescue ProcessFailed => e
-  puts "Command failed: #{e.message}"
-end
-```
+`CMD.cmd(...) { ... }` accepts a block but **never calls it** — the only block
+invocation inside `cmd.rb` is in `CMD.tool`. Verified live by
+`tmp/docaudit/probe_hs_c15_block.rb`: in both pipe and non-pipe mode the block
+body never runs, while `:post` and `stream.add_callback` do. Use
+`:post => proc{}` or stream callbacks for post-join work.
 
-### Suppressing errors
+## Related
 
-```ruby
-io = CMD.cmd("may_fail", no_fail: true)
-io.join
-io.exit_status  # => non-zero (check manually)
-
-# Array form works the same way
-io = CMD.cmd(["may_fail"], no_fail: true)
-```
-
-### Capturing stderr
-
-```ruby
-io = CMD.cmd("verbose_tool", pipe: true, save_stderr: true)
-io.read
-io.join
-io.std_err  # => captured stderr output
-
-# Array form
-io = CMD.cmd(["ls", "/nonexistent"], no_fail: true, save_stderr: true)
-io.std_err  # => "ls: cannot access '/nonexistent': No such file or directory\n"
-```
-
-## Choosing between String and Array form
-
-| Criteria | Use String | Use Array |
-|----------|-----------|-----------|
-| Command is a fixed literal | ✓ | ✓ |
-| Arguments come from user input | | ✓ |
-| You need shell pipes (`\|`) | ✓ | |
-| You need shell redirects (`>`, `<`) | ✓ | |
-| You need variable expansion (`$VAR`) | ✓ | |
-| You need globbing (`*.txt`) | ✓ | |
-| You need the `{opt}` placeholder | ✓ | |
-| You need tool registry lookup (Symbol) | ✓ | |
-| You want to avoid shell injection | | ✓ |
-
-**Rule of thumb:** If any part of the command could contain spaces or
-special characters that you want treated as literal data — especially when
-the data comes from outside your code — use the Array form. If you need
-shell features (pipes, redirects, globbing, variable expansion), use the
-String form.
-
-## Common mistakes
-
-### Forgetting to join in pipe mode
-
-```ruby
-# RISKY: exit status is not checked
-stream = CMD.cmd("may_fail", pipe: true)
-stream.read
-# forgot to join — failure goes undetected
-
-# RIGHT: always join
-stream = CMD.cmd("may_fail", pipe: true)
-stream.read
-stream.join  # raises ProcessFailed if exit != 0
-```
-
-### Using String vs Symbol for tools
-
-```ruby
-# String: runs exactly this command
-CMD.cmd("samtools view input.bam")
-
-# Symbol: goes through tool registry (may install the tool)
-CMD.cmd(:samtools, "view input.bam")
-
-# Array: runs the command directly (no tool registry)
-CMD.cmd(["samtools", "view", "input.bam"])
-```
-
-If you don't need tool installation, pass the command as a String or Array.
-
-### Array form does not support shell features
-
-Because the Array form bypasses the shell entirely, shell operators and
-metacharacters are **not interpreted** — they are passed as literal
-arguments:
-
-```ruby
-# This does NOT pipe — "|" is a literal argument to echo
-CMD.cmd(["echo", "hello", "|", "cat"]).read
-# => "hello | cat\n"
-
-# This does NOT redirect — ">" is a literal argument to echo
-CMD.cmd(["echo", "data", ">", "out.txt"]).read
-# => "data > out.txt\n"
-
-# Variable is NOT expanded
-CMD.cmd(["echo", "$HOME"]).read
-# => "$HOME\n"
-
-# Glob is NOT expanded
-CMD.cmd(["ls", "*.txt"]).read
-# ls tries to open a file literally named "*.txt"
-```
-
-If you need shell pipes, redirects, globbing, or variable expansion, use
-the **String form** instead:
-
-```ruby
-# Shell pipe — use String form
-CMD.cmd("echo hello | cat").read       # => "hello\n"
-
-# Shell redirect — use String form
-CMD.cmd("echo data > out.txt").read    # writes to out.txt
-
-# Variable expansion — use String form
-CMD.cmd("echo $HOME").read             # => "/home/user\n"
-```
-
-### `{opt}` placeholder is String-only
-
-The `{opt}` placeholder is a feature of the String form: it substitutes
-processed options into a specific position in the command string. In Array
-form there is no string template, so `{opt}` is not available. Instead,
-options from the hash are simply appended as separate arguments to the
-command array:
-
-```ruby
-# String form: '{opt}' placeholder controls where options go
-CMD.cmd("sort '{opt}' file.txt", "-n" => true, "-r" => true)
-# runs: sort -n -r file.txt
-
-# Array form: options appended after the command elements
-CMD.cmd(["sort", "file.txt"], "-n" => true, "-r" => true)
-# runs: sort file.txt -n -r
-```
-
-If you need precise control over option placement within the command, use
-the String form with `{opt}`. If you just need options appended at the end,
-either form works.
-
-### Memory-heavy non-pipe mode
-
-Non-pipe mode (`pipe: false`, the default) collects all stdout in memory. For
-commands producing large output, use `pipe: true` and process line by line.
-
-## See also
-
-- [Handling Streams](HandlingStreams.md) — Details on stream lifecycle and
-  joining.
-- [Logging and Progress](LoggingAndProgress.md) — CMD logs stderr through
-  the Log module.
-- [Developer: Streaming Model](../developer/StreamingModel.md) — How CMD
-  uses ConcurrentStream internally.
+- [Handling Streams](HandlingStreams.md) — the returned object's lifecycle.
+- [Streaming Model](../developer/StreamingModel.md) — internals, error paths.
+- [Working with Files](WorkingWithFiles.md) — `Open.grep` on top of `CMD`.

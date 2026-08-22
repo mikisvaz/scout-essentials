@@ -1,314 +1,211 @@
 # Cookbook
 
-Practical recipes combining multiple scout-essentials utilities to solve
-common tasks. Each recipe is self-contained and shows the recommended
-approach.
+Short, self-contained recipes that combine the scout-essentials modules.
+Every snippet here was executed; the backing probes are listed under each
+heading and live in `tmp/rewrite_C/` (older probes in `tmp/rewrite_A/`,
+`tmp/rewrite_B/` are referenced by their P-numbers, which map to
+`research/behavior-probes.md`).
 
----
+The theme of the library: plain objects annotated with provenance, paths
+resolved from a declaration, work cached on disk, streams piped without
+holding everything in memory.
 
-## Reading a large TSV file line by line
+## Get-or-build a file: `claim` + `produce_and_find`
 
 ```ruby
-Open.read("data.tsv") do |line|
-  fields = line.chomp.split("\t")
-  process(fields)
+require 'scout-essentials'
+
+module Data
+  extend Resource
+  self.pkgdir = 'cookbook_probe'
 end
+
+Data.claim Data.tmp['list'], :string, "S001\nS002\nS003\n"
+found = Data.tmp['list'].produce_and_find
+Open.read(found)              # => "S001\nS002\nS003\n"
+Data.tmp['list'].produce_and_find   # second call returns the same path, no work
 ```
 
-Open handles `.gz`/`.bgz`/`.zip` compression transparently, so the same code
-works for `data.tsv.gz`.
+`Resource.claim(path, type, contents, block)` registers *how* a file is
+produced (a type like `:string`/`:proc`, literal contents, or a block); the
+claimed `Path` is annotated and its `produce` materialises it into the
+resource tree (`lib/scout/resource/path.rb:2`,
+`lib/scout/resource/produce.rb`). `produce_and_find` produces when needed and
+returns `self.find`. Probe: `tmp/rewrite_C/probe_03_cookbook.rb`
+(`claim` + first/second call returning the same path, `Open.read` content).
 
----
+## Cache invalidation with `:update` and `:check`
 
-## Caching the result of a download
+`Persist.persist` normally returns the cached value untouched. Two options
+change that (`lib/scout/persist.rb`):
 
 ```ruby
-content = Persist.persist("ref_data", :string, path: "cache/ref.fa") do
-  Open.read("https://example.com/reference.fa")
-end
+a = Persist.persist('expensive', :marshal, :update => false) { "computed-once" }
+b = Persist.persist('expensive', :marshal, :update => false) { "recomputed" }
+a == b                        # => true, block skipped both times
+c = Persist.persist('expensive', :marshal, :update => true)  { "forced-recompute" }
+c                             # => "forced-recompute" — block re-run
+
+d = Persist.persist('dependent', :marshal,
+                    :check => 'tmp/src.txt') { "from-#{Open.read('tmp/src.txt')}" }
 ```
 
-First call downloads and caches. Subsequent calls load from cache.
+`:update => true` always re-runs the block; `:check` names a file whose mtime
+invalidates the entry. Probe: probe_03 (a == b, block not re-run; `:update`
+re-runs; `:check` path resolves).
 
----
-
-## Streaming a command pipeline
+## Fetch a remote file
 
 ```ruby
-# Generate → filter → sort, all streaming, with error propagation
-generator = CMD.cmd("seq 1 1000", pipe: true)
-filter    = CMD.cmd("grep 5", in: generator, pipe: true)
-sorter    = CMD.cmd("sort -n", in: filter, pipe: true)
+require 'scout-essentials'
 
-sorter.each_line { |line| puts line }
+url  = 'https://example.org/data.tsv'
+Open.wget(url, :auto)         # downloads; cached under Open.remote_cache_dir
+data = Open.wget(url)         # serves from cache on the next call
 
-# Join in reverse order (consumer to producer) to detect failures
-sorter.join
-filter.join
-generator.join
+Open.scp('user@host:/path/file', 'local_copy', :target => 'user@host')
 ```
 
----
+`Open.wget` shells out to `wget` (`lib/scout/open/remote.rb`); `Open.read` on
+an `http(s)://` or `ssh:` URL fetches transparently. Retries and rate limits
+are controlled by `Open.wait(lag, key)`. See
+[RemoteData.md](RemoteData.md) and
+[Working with Files](WorkingWithFiles.md).
 
-## Annotating a list of sample names with metadata
+## Annotate, serialise, restore
 
 ```ruby
+require 'scout-essentials'
+
 module SampleInfo
   extend Annotation
-  annotation :organism, :tissue, :donor
+  annotation :organism, :tissue
 end
 
-samples = ["S001", "S002", "S003"].map do |name|
-  SampleInfo.setup(name.dup, organism: "Human", tissue: "Liver")
+sample = SampleInfo.setup('S001', :organism => 'Human', :tissue => 'Liver')
+sample.annotation_hash        # {:organism=>"Human", :tissue=>"Liver"}
+sample.serialize              # {:organism=>"Human", :tissue=>"Liver",
+                              #  :annotation_types=>[SampleInfo], :annotated_array=>false,
+                              #  :literal=>"S001"}
+
+restored = Annotation.setup('S003', 'SampleInfo',
+                            'organism' => 'Human', 'tissue' => 'Liver')
+restored.tissue               # => "Liver"
+```
+
+`Annotation.setup(obj, "A|B", hash)` is the module-level deserialiser; the
+`"A|B"` string is split on `|` and each name is looked up as a constant. An
+unknown type name is **warned about and skipped** (probe_03 prints
+`Annotation NoSuchAnnotation not defined` on STDERR, then
+`Annotation.setup('S004', 'NoSuchAnnotation', ...)` returns the plain
+un-annotated string). `serialize` produces a plain `Hash` with `:literal`,
+`:annotation_types` (module objects) and `:annotated_array` keys. There is no
+TSV serialisation of annotations in this repo — `Annotation.tsv` belongs to
+scout-gear (see the [attribution table](../developer/Architecture.md)).
+
+## Stream a pipeline without buffering
+
+```ruby
+require 'scout-essentials'
+
+stream = Open.open_pipe do |sin|
+  ['S001', 'S002'].each { |s| sin.write "1\t#{s}\n" }
+  sin.close
 end
-
-samples.each do |s|
-  puts "#{s} (#{s.organism}, #{s.tissue})"
-end
-# S001 (Human, Liver)
-# S002 (Human, Liver)
-# S003 (Human, Lua)
+Open.consume_stream(stream)   # => "1\tS001\n1\tS002\n"
 ```
 
----
-
-## Building a progress-bar-enhanced file processor
-
-```ruby
-files = Dir.glob("data/*.txt")
-
-Log::ProgressBar.with_bar(files.size, desc: "Processing") do |bar|
-  files.each do |file|
-    content = Open.read(file)
-    process(content)
-    bar.tick
-  end
-end
-```
-
----
-
-## Atomic write of computed results
+`Open.open_pipe` builds an IO from a block and returns it unread; `consume_stream`
+drains it. `tee_stream` splits one stream into two consumers:
 
 ```ruby
-result = compute_result()
-
-# sensible_write ensures no partial reads by other processes
-Open.sensible_write("output/result.txt", result)
-```
-
----
-
-## On-demand resource production with caching
-
-```ruby
-module GenomeRef
-  extend Resource
-  self.pkgdir = 'genome'
-
-  claim self.hg38_fa, :url, "https://example.com/hg38.fa.gz"
-  claim self.hg38_index, :proc do
-    CMD.cmd("samtools faidx #{GenomeRef.hg38_fa.produce}")
-  end
-end
-
-# First access downloads and builds
-index_path = GenomeRef.hg38_index.produce
-
-# Subsequent accesses are instant
-Open.read(index_path)
-```
-
----
-
-## Using key-indifferent hashes for configuration
-
-```ruby
-config = IndiferentHash.setup({
-  server: { host: "localhost", port: 8080 },
-  retries: 3,
-  "timeout" => 30
-})
-
-config[:server][:host]   # => "localhost"
-config["server"]["port"] # => 8080
-config[:timeout]         # => 30
-config["retries"]        # => 3
-```
-
----
-
-## Temporary file with automatic cleanup
-
-```ruby
-TmpFile.with_file do |tmp|
-  Open.write(tmp, "temporary data")
-  result = CMD.cmd("wc -l #{tmp}").read
-  puts result
-end  # tmp is deleted
-```
-
----
-
-## Named array for structured data
-
-```ruby
-record = NamedArray.setup(
-  [42, "active", 3.14],
-  [:count, :status, :score]
+Open.write('tmp/in.txt', "1\n2\n3\n")
+main, copy = Open.tee_stream(
+  CMD.cmd('gzip -c', :pipe => true, :in => Open.open('tmp/in.txt'))
 )
-
-puts record[:status]   # => "active"
-puts record.to_hash    # => {:count=>42, :status=>"active", :score=>3.14}
+Open.consume_stream(main, true, 'tmp/in.txt.gz')   # writes the file
+copy.join                                          # waits for the copy thread
+File.exist?('tmp/in.txt.gz')                       # => true
 ```
 
----
-
-## Annotated streams with metadata
+Consumers follow the rescue contract for the deliberate-abort signals:
 
 ```ruby
-stream = CMD.cmd("grep error /var/log/syslog", pipe: true)
-stream.filename = "error_lines"
-stream.extend(Log)  # not necessary; for illustration
-
-lines = stream.read.split("\n")
-stream.join
-
-Log.info "Found #{lines.size} error lines from #{stream.filename}"
-```
-
----
-
-## Path resolution with custom maps
-
-```ruby
-# Add a custom search location
-Path.add_path(:cluster_data, "/shared/data/{PKGDIR}/{SUBPATH}")
-
-path = Path.setup("genome/hg38.fa")
-path.find  # checks current dir, user dir, global, /shared/data/..., etc.
-```
-
----
-
-## Persisting complex objects
-
-```ruby
-# Marshal can store any Ruby object
-Persist.persist("model_state", :marshal) do
-  { weights: [0.1, 0.2, 0.3], bias: 0.5, trained: true }
+begin
+  data = Open.consume_stream(stream)
+rescue Aborted, AbortedStream
+  Log.warn "aborted mid-stream"
 end
 ```
 
----
+Probe: probe_03 (open_pipe data, tee_stream producing a real gzip file).
+See [Handling Streams](HandlingStreams.md) and the
+[Streaming Model](../developer/StreamingModel.md).
 
-## Combining annotation and path resolution
+## Progress bars
 
 ```ruby
-module DataPipeline
-  extend Resource
-  self.pkgdir = 'pipeline'
+require 'scout-essentials'
 
-  claim self.input.data, :url, "https://example.com/input.dat"
-  claim self.output.results, :proc do |filename|
-    input = DataPipeline.input.data.produce
-    output = CMD.cmd("process_tool #{input}").read
-    Open.write(filename, output)
-    nil
-  end
+items = (1..100).to_a
+
+Log::ProgressBar.with_obj_bar(items, 100) do |bar|
+  items.each { bar.tick }
 end
 
-# Everything is lazy — production chains automatically
-results = DataPipeline.output.results.produce
-```
-
----
-
-## Logging with timing
-
-```ruby
-Log.debug "Loading dataset" do
-  @data = Open.read("large_file.tsv").split("\n")
+Log::ProgressBar.with_bar(20, :desc => 'Counting') do |bar|
+  20.times { bar.tick }
 end
-# Log output: "Loading dataset (1.2s)"
+
+bar = Log::ProgressBar.new_bar(10, :desc => 'Half-way')
+10.times { bar.tick }
+Log::ProgressBar.remove_bar(bar)
 ```
 
----
+The block of `with_obj_bar` receives **only the bar**; the object is never
+yielded back (`log/progress/util.rb:167-170`). The *second* argument selects
+the bar: a String is the description, a Numeric the max, a Hash the options,
+an existing bar object is reused, and `true` guesses the max from the first
+argument via `guess_obj_max` — which returns `nil` even for a plain `Array`
+in a bare scout-essentials process: the first `when TSV` arm raises
+`NameError` (the constant is not defined here) and the surrounding
+`rescue Exception` turns that into `nil` (live check;
+`log/progress/util.rb:101-137`). Pass a Numeric max or a `:max` hash for
+deterministic sizing. There is no `Log.bar` helper; use
+`Log::ProgressBar.new_bar` / `remove_bar`.
 
-## Case-insensitive hash for user input
-
-```-resync
-```ruby
-params = CaseInsensitiveHash.setup({Format: "CSV", TYPE: "gene"})
-
-params["format"]  # => "CSV"
-params[:type]     # => "gene"
-```
-
----
-
-## Writing a command-line tool with SOPT
-
-```ruby
-#!/usr/bin/env ruby
-require 'scout/simple_opt'
-require 'scout/open'
-require 'scout/log'
-
-SOPT.parse <<~DOC
-  -f--file* Input file
-  -o--output Output file
-  -v--verbose Verbose mode
-DOC
-
-options = SOPT.consume
-
-Log.severity = 0 if options[:verbose]
-file = options[:file]
-
-content = Open.read(file)
-processed = process(content)
-
-if options[:output]
-  Open.sensible_write(options[:output], processed)
-else
-  puts processed
-end
-```
-
----
-
-## Running a command safely with variable arguments
-
-When command arguments come from user input, filenames, or other variable
-sources, use the Array form to avoid shell injection. Each element becomes
-a single argument, and special characters are treated as literal data:
+## Command-line usage with SOPT
 
 ```ruby
-# User-provided filename and search pattern — safe with Array form
-filename = params[:file]       # e.g. "my data; rm -rf /"
-pattern  = params[:pattern]    # e.g. "test | cat"
+require 'scout-essentials'
 
-output = CMD.cmd(["grep", pattern, filename]).read
-# The shell would have interpreted ; and | — the Array form does not.
+SOPT.parse <<~OPT
+  -o--organism* Organism code
+  -t--tissue*   Tissue of origin
+  -d--dry-run   Skip writing
+OPT
+
+argv    = ['-o', 'Human', 'positional', '-d']
+options = SOPT.consume(argv)   # argv is mutated: matched args removed
+argv                          # => ["positional"]
+
+SOPT.require(options, :organism)   # ParameterException when nil
 ```
 
-If you need shell features (pipes, redirects, globbing, variable
-expansion), use the String form instead. See [Running
-Commands](RunningCommands.md) for guidance on choosing between the two
-forms.
+The `*` marks an option as **taking a string value**; without it the option is
+a boolean. Probe: probe_02 (options hash, `argv_left == ["positional"]`,
+`SOPT.require` raising). See
+[Command-Line Options](CommandLineOptions.md).
 
----
+## Recipe index
 
-## See also
-
-Each recipe builds on the concepts explained in the individual user guides:
-
-- [Annotating Data](AnnotatingData.md)
-- [Working with Files](WorkingWithFiles.md)
-- [Running Commands](RunningCommands.md)
-- [Logging and Progress](LoggingAndProgress.md)
-- [Handling Streams](HandlingStreams.md)
-- [Caching Results](CachingResults.md)
-- [Producing Resource](ProducingResources.md)
-- [Command-Line Options](CommandLineOptions.md)
+| Task | Tool | Page |
+| --- | --- | --- |
+| Resolve a path | `Path.setup`, `Resource` | [Working with Files](WorkingWithFiles.md) |
+| Run a command | `CMD.cmd` | [Running Commands](RunningCommands.md) |
+| Cache a computation | `Persist.persist` | [Caching Results](CachingResults.md) |
+| Build a file on demand | `Resource.claim` + `produce_and_find` | [Producing Resources](ProducingResources.md) |
+| Annotate objects | `Annotation` | [Annotating Data](AnnotatingData.md) |
+| Pipe data | `Open.open_pipe`, `CMD.cmd(:pipe)` | [Handling Streams](HandlingStreams.md) |
+| Log and show progress | `Log`, `Log::ProgressBar` | [Logging and Progress](LoggingAndProgress.md) |
+| Parse options | `SOPT` | [Command-Line Options](CommandLineOptions.md) |

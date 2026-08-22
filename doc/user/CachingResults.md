@@ -1,187 +1,182 @@
 # Caching Results
 
 This guide explains how to cache computation results in scout-essentials
-using the Persist module. You'll learn about the persist pattern,
-serialization types, memory caching, and custom drivers.
+using the `Persist` module: the `persist` pattern, serialization types,
+staleness invalidation, in-memory caching, and locking.
 
-## When to use this
+## The persist pattern
 
-- You have expensive computations that should run only once.
-- You need to serialize Ruby objects to disk in a type-aware way.
-- You want a simple caching API that handles atomic writes and locking.
-- You need to cache results that are keyed by input parameters.
-
-## Concepts
-
-### The persist pattern
-
-The core of Persist is the `persist` method. You give it a unique key, a
-serialization type, and a block. If a cached result exists, it's loaded. If
-not, the block runs, the result is saved, and then returned.
+`Persist.persist` runs a block once and reuses the cached result on later
+calls:
 
 ```ruby
-result = Persist.persist("my_computation", :marshal) do
-  expensive_computation
+require 'scout-essentials'
+
+value = Persist.persist('result', :string) do
+  "expensive computation"
 end
+
+value # => "expensive computation"  (first call: block runs)
+value # => "expensive computation"  (second call: loaded from disk)
 ```
 
-The first call runs the block and saves the result. Subsequent calls load
-the cached result directly.
+The signature is `Persist.persist(name, type = :serializer, options = {}, &block)`:
 
-### Serialization types
+- `name` — a string used to build the cache file name (a path is also
+  accepted; its `filename` is used). Unless you give `:path`/`:persist_path`,
+  the cache lands under `Persist.cache_dir`, which returns the relative
+  `Path`/String `var/cache/persistence`.
+- `type` — a serialization type (table below); `:serializer` is the default
+  and resolves to `:json` (`Persist::SERIALIZER == :json`).
+- `options` — a plain `Hash` of options. `persist_path` takes an options
+  hash, and a **second positional argument is NOT supported**: the option key
+  is `:persist_path` (or `:path`), never a positional argument.
 
-Persist supports many serialization types. Choose the one that best fits
-your data:
+```ruby
+Persist.persistence_path('result')                 # => "var/cache/persistence/result"
+Persist.persistence_path('result', key: 'X')       # => "var/cache/persistence/result[X]"
+Persist.persistence_path('result', :marshal)       # TypeError — no positional type
+Persist.persistence_path('result', dir: tmp_dir)   # honoured via :dir
+```
 
-| Type | Serialization | Deserialization |
-|------|--------------|-----------------|
-| `:string`, `:text` | Raw string | Raw string |
-| `:integer` | `to_s` | `to_i` |
-| `:float` | `to_s` | `to_f` |
-| `:boolean` | `to_s` | `"true"` → true, else false |
-| `:array` | Lines joined by `\n` | Split by `\n` |
-| `:yaml` | `YAML.dump` | `YAML.load` |
-| `:json` | `JSON.generate` | `JSON.parse` |
-| `:marshal` | `Marshal.dump` | `Marshal.load` |
+**Options:**
+
+| Option | Meaning |
+|---|---|
+| `:persist_path` / `:path` | Exact file to use as cache (String or Path) |
+| `:persist` | `false` bypasses persistence entirely and just returns `yield` |
+| `:no_load` | `true` returns the cache file itself instead of its contents |
+| `:update` | Force recomputation. A `true` recomputes; a `Time`/number recomputes when the cache is older; a `Path` uses that file's `mtime` |
+| `:check` | Array of dependency paths; the cache is invalidated when any is newer |
+| `:canfail` | Swallow errors, returning `nil` (or the file with `:no_load`) instead of raising |
+| `:data` | Passed as the block argument when the block has arity 1 |
+| `:tee_copies` | Number of extra stream copies when the block returns a stream |
+| `:lockfile` | Use a specific lock file instead of the default |
+
+If the block has arity 1, it receives the cache file (a `Path`/String), and
+its return value is loaded from disk only if it is `nil`:
+
+```ruby
+Persist.persist('result', :text, persist_path: path) do |file|
+  Open.write(file, "written by block\n")
+end # => loads the file
+```
+
+## Serialization types
+
+`Persist.serialize` / `Persist.deserialize` / `Persist.save` / `Persist.load`
+understand these types (`type` is `nil, :string, :text, :integer, :float,
+:boolean, :file, :path, :select, :folder, :binary, :array, :yaml, :json,
+:marshal, :annotation, :serializer`, plus `:stream` on load):
+
+| Type | Saved as | Loaded as |
+|---|---|---|
+| `nil`, `:text` | `to_s` | String, exactly as written (no stripping) |
+| `:string` | `to_s` | String, stripped |
+| `:integer`, `:float` | `to_s` | `Integer` / `Float` |
+| `:boolean` | `to_s` | `true` only if in `TRUE_STRINGS` (`"true"`, `"yes"`, `"y"`, `"t"`, `"on"` and their case variants, `"1"`) |
+| `:file`, `:folder`, `:select` | `to_s` | Stripped String (a `:file` entry starting with `"./"` is resolved relative to the cache file's directory) |
 | `:path` | `to_s` | `Path.setup(...)` |
-| `:binary` | Raw bytes | Raw bytes |
-| `:file` | Path string | Path (relative to cache) |
+| `:binary` | bytes (encoding forced to ASCII-8BIT) | bytes read with `mode: 'rb'` |
+| `:array` | elements joined with `"\n"` | Array of lines |
+| `:yaml` | `to_yaml` | Loaded with `Open.yaml` (`YAML.unsafe_load` — `Open.yaml` is defined in the persist layer, `lib/scout/persist/open.rb:11`), so hashes/arrays round-trip. Note `:yaml_array` goes through the per-line `deserialize` path (`YAML.parse`) and yields `Psych::Nodes::Document` objects — use `:json_array` for array round-trips |
+| `:json` | `to_json` | `JSON.parse` |
+| `:marshal` | `Marshal.dump` | `Marshal.load` |
+| `:annotation` | `Annotation.tsv(content, :all).to_s` | `Annotation.load_tsv(TSV.open(...))` (part of the scout-gear ecosystem, not usable standalone) |
+| `:serializer` | alias for `:json` | alias for `:json` |
+| `:stream` (load only) | — | `Open.open(file)` |
+| `:file_array` (load only) | — | Array of files, `"./"`-relative entries resolved |
 
-Array variants like `:yaml_array` or `:string_array` serialize each element
-individually and join with newlines.
+Any type can take an `_array` suffix (`:yaml_array`, `:path_array`, …) when
+saving or loading: elements are serialized individually and joined/split on
+newlines. **No type suffix is ever appended to cache file names** — two
+different types sharing a `name` collide on the same cache file. An unknown
+type raises `RuntimeError: Persist does not know <type>`.
 
-## Basic usage
-
-### Caching a computation
-
-```ruby
-# The key uniquely identifies the computation
-result = Persist.persist("unique_key_here", :marshal) do
-  compute_large_matrix(input_params)
-end
-```
-
-### Using a specific cache file
-
-```ruby
-# Cache to a specific path instead of an auto-generated one
-result = Persist.persist("key", :yaml, path: "cache/result.yaml") do
-  computation
-end
-```
-
-### Checking if cached
+## Cache location and lock location
 
 ```ruby
-# Check if a cache file exists without triggering computation
-path = Persist.persistence_path("my_key", :marshal)
-File.exist?(path)  # => true if cached
+Persist.cache_dir    # => var/cache/persistence   (a relative String path)
+Persist.cache_dir = '/some/other/dir'
+Persist.lock_dir     # => $HOME/.scout/tmp/persist_locks  (an absolute String)
+Persist.lock_dir = '/some/other/locks'
 ```
 
-## Serialization
+Locks live under `Persist.lock_dir` and are named after the cache file plus
+`.persist`: `<cache-file>.persist`. They are `Open.lock` lockfiles (see
+[Working with Files](WorkingWithFiles.md)); there is **no** `Persist.lock` —
+`Persist.persist` uses `Open.lock` internally.
 
-### Saving and loading directly
+## Staleness: `:update` and `:check`
+
+`:check` lists dependencies; when any of them is newer than the cache, the
+cache is recomputed. `:update` forces recomputation, optionally guarded by a
+`Time` (numeric age in seconds) or a `Path` (an mtime to compare against):
 
 ```ruby
-# Save any object
-Persist.save(my_data, "data.yaml", :yaml)
-Persist.save(my_hash, "data.json", :json)
-Persist.save(my_object, "data.marshal", :marshal)
+cache = Path.setup('var/cache/persistence/example')
 
-# Load
-data = Persist.load("data.yaml", :yaml)
+Persist.persist('example', :string, persist_path: cache, check: [input]) do
+  "computed"
+end
+# input updated -> "computed" re-runs
+
+Persist.persist('example', :string, persist_path: cache, update: 60) { "x" }
+# re-runs only if the cache is older than 60 seconds
+
+Persist.persist('example', :string, persist_path: cache, update: dep_path) { "x" }
+# re-runs only if dep_path's mtime is newer than the cache's
 ```
 
-### Custom serialization drivers
-
-Register custom serialization for your own types:
-
-```ruby
-# Register a custom serializer
-Persist.save_drivers[:my_format] = lambda do |file, content|
-  Open.write(file, MySerializer.dump(content))
-end
-
-# Register a custom deserializer
-Persist.load_drivers[:my_format] = lambda do |file|
-  MySerializer.load(Open.read(file))
-end
-
-# Use it
-Persist.persist("key", :my_format) do
-  MyData.new(...)
-end
-```
+`:check` and `:update` (and the `update` computation itself) depend on
+`Open.mtime` and on `file.outdated?(check)`, which are `Path` methods; give
+`persist` a `Path` (`persist_path:` a `Path.setup(...)`), not a plain
+`String`, when you rely on them.
 
 ## Memory caching
 
-For in-process caching that doesn't write to disk:
+Type `:memory` stores the block result in a process-global hash
+(`Persist::MEMORY_CACHE`) instead of a file; a custom repo hash can be passed
+with `:memory:` / `:repo:`:
 
 ```ruby
-result = Persist.persist("key", :memory) do
-  expensive_computation
-end
+Persist.persist('m', :memory) { [1, 2] } # => [1, 2]
+
+Persist.memory('m2', key: 'K') { "in-memory-value" }
+# => "in-memory-value"; the key is composed into the entry name
 ```
 
-Memory caches persist only for the lifetime of the process. They are useful
-for avoiding redundant computations within a single run.
+`Persist.memory(name, options, &block)` is the helper for the common
+`[name, key]` case.
 
-## Cache configuration
+## Streams and `KeepLocked`
 
-### Default directories
-
-Persist uses two directories:
-- `Persist.cache_dir` — where cached data files are stored.
-- `Persist.lock_dir` — where lock files for concurrent access are stored.
+When the block returns an `IO`/`StringIO`, `persist` does not block: it
+tee's the stream so the caller consumes one copy while a background thread
+writes another to the cache file. The returned stream keeps the persist lock
+until it is joined (`KeepLocked`); join the stream (or let `autojoin` run)
+before relying on the cache file.
 
 ```ruby
-# View defaults
-Persist.cache_dir  # => #<Path var/cache/persistence>
-Persist.lock_dir   # => #<Path tmp/persist_locks>
-
-# Override
-Persist.cache_dir = Path.setup("/my/cache/dir")
-Persist.lock_dir = "/my/lock/dir"
+stream = Open.open_pipe { |sin| 10.times { |i| sin.puts "row#{i}" } }
+res = Persist.persist('rows', :string, persist_path: path) { stream }
+res # => a ConcurrentStream (IO); the cache file is complete once res.join
 ```
 
-## Common mistakes
+## Error handling
 
-### Using the wrong serialization type
+If the block raises, `persist` removes the partial cache file (unless the
+exception is a `DontPersist`) and re-raises — **unless** `:canfail` is set,
+in which case it returns `nil` (or the file with `:no_load`):
 
 ```ruby
-# WRONG: marshaling a simple string is wasteful
-Persist.persist("key", :marshal) { "hello" }
-
-# RIGHT: use :string for simple values
-Persist.persist("key", :string) { "hello" }
+Persist.persist('failing', :string, canfail: true) { raise "boom" } # => nil
 ```
 
-### Non-unique keys
+## Related
 
-```ruby
-# WRONG: same key for different inputs
-Persist.persist("results", :marshal) { compute(a) }
-Persist.persist("results", :marshal) { compute(b) }
-# Second call returns cached result from compute(a)!
-
-# RIGHT: include input in the key
-Persist.persist("results_#{a}", :marshal) { compute(a) }
-Persist.persist("results_#{b}", :marshal) { compute(b) }
-```
-
-### Forgetting that persist is idempotent
-
-The block passed to `persist` runs only if the cache is empty. If you need
-to recompute, delete the cache file first:
-
-```ruby
-File.delete(Persist.persistence_path("key", :marshal))
-```
-
-## See also
-
-- [Working with Files](WorkingWithFiles.md) — Persist uses Open for atomic
-  writes.
+- [Working with Files](WorkingWithFiles.md) — `Open.lock`, `sensible_write`,
+  and I/O that `Persist` builds on.
 - [Producing Resources](ProducingResources.md) — Resource composes with
   Persist.
 - For internal implementation details, see

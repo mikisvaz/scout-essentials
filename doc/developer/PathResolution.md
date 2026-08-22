@@ -1,202 +1,200 @@
 # Path Resolution
 
-This document explains how the Path resolution system works internally. It
-is intended for framework contributors who need to understand or extend the
-path search mechanism.
+`Path` is a `String` subclass carrying resource metadata. This page explains
+how an *unlocated* logical name such as `data/config.yaml` is turned into a
+real filesystem location, how to configure the search, and how `find`,
+`follow`, `identify`, and friends behave.
 
-## Why this abstraction exists
+## Anatomy of a `Path`
 
-Scout-based applications reference data files by logical names (e.g.,
-`data/config.yaml`), not absolute paths. The physical location of these
-files varies by installation: user-local, global, cached, or in a package
-directory. Path resolution translates logical names to physical paths by
-searching a configurable set of locations called "path maps."
-
-This separation lets the same code work across different installations
-without hardcoding paths.
-
-## How it works
-
-### Path as an annotated string
-
-A Path is a String extended with path resolution behavior:
+A `Path` is a plain `String` plus annotations (`:pkgdir`, `:libdir`,
+`:path_maps`, `:map_order`, `:where`, `:original`), added by the `Annotation`
+mechanism. Because it is a String, it can be joined, split, and used with
+core `File` methods; annotations travel along when you `join` or use `/`:
 
 ```ruby
-path = Path.setup("data/config.yaml")
-path.class       # => String
-path.is_a?(Path) # => true (checked via annotation)
+require 'scout-essentials'
+
+p = Path.setup('data/config.yaml')
+p.pkgdir    # => "scout" (Path.default_pkgdir)
+p.located?  # => false ('data/config.yaml' is relative, not './x' or '/x')
+p.to_s      # => "data/config.yaml"
+
+p.join(:a)          # => "data/config.yaml/a"
+p.join(:a, :b)      # => "data/config.yaml/b/a"  (b goes first)
+p / :a              # => "data/config.yaml/a"
+p._toplevel         # => "data"   (first path segment)
+p._subpath          # => "config.yaml" (the rest)
+p.data.samples      # => "data/config.yaml/data/samples"  (method_missing
+                    #    appends a segment, right to left)
 ```
 
-The annotation carries metadata: `pkgdir`, `libdir`, `path_maps`,
-`map_order`, and the resolved location.
+`[]` and `/` are both aliases of `join`. **There is no `Path#[]=` and no
+class-level `Path.map_order=`** — use `Path.add_path`,
+`Path.prepend_path`, `Path.append_path`, or the per-instance
+`path_maps`/`map_order` annotations instead.
 
-### Path maps
+## Location: `find`
 
-A path map is a template string with placeholders. When resolving a logical
-path, Path substitutes the placeholders to produce candidate physical paths:
+`find` resolves an unlocated path by trying every map in `map_order` until
+one produces an existing file (or a `.gz`/`.bgz`/`.zip` alternative).
+`find` **never returns nil**:
+
+- If the path is already `located?` (starts with `/`, `./`, or `~/`) and
+  exists, it returns the expanded path.
+- If it is `located?` but missing, it tries the compressed alternatives and
+  otherwise **returns itself**.
+- If it is unlocated, it walks `map_order`; on total failure it returns
+  `follow(:default)` — the default location where the file *would* be.
 
 ```ruby
-Path.path_maps[:user]  # => "{HOME}/.scout/{TOPLEVEL}/{SUBPATH}"
+p = Path.setup('data/config.yaml')
+p.find             # tries :current, :user, :home, ... then :default
+p.find(:user)      # force one specific map
+p.find(:all)       # == find_all
+p.exists?          # find then File.exist?
 ```
 
-Placeholders:
-- `{PATH}` — the logical path (e.g., `data/config.yaml`)
-- `{PKGDIR}` — package directory name
-- {SUBPATH} — sub-path within the package
-- `{HOME}` — user home directory
-- `{PWD}` — current working directory
-- `{TOPLEVEL}` — top-level directory name (first component of the path)
-
-### Map order
-
-`map_order` determines the sequence in which maps are searched:
+The returned `Path` is annotated with `where` (the map that matched) and
+`original` (a copy of the unlocated path) so you can trace how a file was
+resolved:
 
 ```ruby
-Path.map_order
-# => [:current, :user, :global, :cache, :tmp, :lib, ...]
+found = p.find
+found.where     # e.g. :user
+found.original  # the original unlocated Path
 ```
 
-The first map that produces an existing file wins. If no map resolves to
-an existing file, `find` returns nil.
+## The default map order
 
-### The `find` method
+The built-in maps and their order (13 entries) are:
+
+| # | Map | Template |
+|---|---|---|
+| 1 | `:current` | `{PWD}/{TOPLEVEL}/{SUBPATH}` |
+| 2 | `:user` | `{HOME}/.{PKGDIR}/{TOPLEVEL}/{SUBPATH}` |
+| 3 | `:home` | `{HOME}/{TOPLEVEL}/{PKGDIR}/{SUBPATH}` |
+| 4 | `:local` | `/usr/local/{TOPLEVEL}/{PKGDIR}/{SUBPATH}` |
+| 5 | `:global` | `/{TOPLEVEL}/{PKGDIR}/{SUBPATH}` |
+| 6 | `:usr` | `/usr/{TOPLEVEL}/{PKGDIR}/{SUBPATH}` |
+| 7 | `:scout_essentials_lib` | `<gem libdir>/{TOPLEVEL}/{SUBPATH}` |
+| 8 | `:lib` | `{LIBDIR}/{TOPLEVEL}/{SUBPATH}` |
+| 9 | `:fast` | `/fast/{TOPLEVEL}/{PKGDIR}/{SUBPATH}` |
+| 10 | `:cache` | `/cache/{TOPLEVEL}/{PKGDIR}/{SUBPATH}` |
+| 11 | `:bulk` | `/bulk/{TOPLEVEL}/{PKGDIR}/{SUBPATH}` |
+| 12 | `:default` | `{PWD}/{TOPLEVEL}/{SUBPATH}` |
+| 13 | `:tmp` | `/tmp/{PKGDIR}/{TOPLEVEL}/{SUBPATH}` |
+
+A per-instance `map_order` is recomputed lazily as
+`(Path.map_order & available_maps) + (remaining maps, in reverse key order)`.
+This is why a new map registered with `Path.add_path` (which clears the
+class-level order) or `p.add_path` (which clears the instance order) ends up
+at the *end* of the effective order, after the built-ins:
 
 ```ruby
-def find
-  map_order.each do |map_name|
-    template = path_maps[map_name]
-    candidate = expand_template(template)
-    return candidate if File.exist?(candidate)
-  end
-  nil
-end
+p = Path.setup('data/config.yaml')
+p.add_path(:onlymine, '/x/{SUBPATH}')
+p.map_order # => [:current, :user, ..., :tmp, :onlymine]
 ```
 
-The actual implementation also handles:
-- Alternative extensions: if `data/config.yaml` doesn't exist, it checks
-  `data/config.yaml.gz`, `data/config.yaml.bgz`, etc.
-- `{PATH/old/new}` style inline substitutions.
-- Resource-backed paths: if the path has a Resource claim, `find` may
-  trigger production.
+`*_lib` maps (e.g. `:scout_essentials_lib`) are regular entries built from
+the gem's own libdir at load time; `{LIBDIR}` in a template resolves to the
+`libdir` annotation or, failing that, the directory of the calling library.
 
-### The `produce` method
+## `follow`: applying a map without searching
 
-For Resource-backed paths, `produce` ensures the file exists by triggering
-the production logic (download, generate, install):
+`follow(map)` applies one template, no matter whether the target exists:
 
 ```ruby
-path.produce  # creates the file if missing, returns the path
+Path.setup('data/config.yaml').follow(:user)
+# => "$HOME/.scout/data/config.yaml"
 ```
 
-## Configuration
-
-### Adding path maps
+Placeholders available in templates: `{PWD}`, `{HOME}`, `{PKGDIR}`,
+`{RESOURCE}`, `{TOPLEVEL}`, `{SUBPATH}`, `{BASENAME}`, `{PATH}`, `{LIBDIR}`,
+`{MAPNAME}`, `{REMOVE}` (deletes itself and the following slash). A template
+without any placeholder gets `{PATH}` appended, so the *whole path* is used
+verbatim. A map value may be another map name (a `Symbol`), which is
+dereferenced until a String is found. When `map_name` is an unknown String,
+`follow` builds `<map_name>/{TOPLEVEL}/{SUBPATH}` on the fly — this is how
+`Scout.etc` (`"etc"`) resolves to `$HOME/.scout/etc`:
 
 ```ruby
-# Add a new search location
-Path.add_path(:my_location, "/custom/data/{PATH}")
-
-# Prepend (higher priority)
-Path.prepend_path(:user, "/shared/{PATH}")
-
-# Append (lower priority)
-Path.append_path(:global, "/opt/data/{PATH}")
+Scout.etc['path_maps'].find  # => "$HOME/.scout/etc/path_maps"
 ```
 
-### Changing map order
-
-```PATH
-```ruby
-# Prioritize cache over user
-Path.map_order = [:current, :cache, :user, :global]
-```
-
-### Following paths
-
-`Path.follow` resolves `{PATH/old/new}` substitutions in a template:
+## Configuring the search
 
 ```ruby
-template = "/shared/{PATH/data/converted}"
-Path.follow("data/file", template)
-# => "/shared/converted/file"
+Path.add_path(:mymap, '/my/{TOPLEVEL}/{SUBPATH}')   # effective in map_order
+Path.prepend_path(:first, '/first/{TOPLEVEL}/{SUBPATH}')
+Path.append_path(:last, '/last/{TOPLEVEL}/{SUBPATH}')
+
+p = Path.setup('data/config.yaml')
+p.add_path(:onlymine, '/x/{SUBPATH}')  # per-instance; recomputes map_order
+p.path_maps                            # a dup of Path.path_maps
+p.map_order                            # instance order, :onlymine included
 ```
 
-## Key invariants
+`Path.load_path_maps(filename)` reads a YAML mapping of `where => location`
+and registers each with `add_path`; at boot,
+`Scout.etc['path_maps']` (i.e. `$HOME/.scout/etc/path_maps`) is loaded this
+way, so users can add search locations without code changes.
 
-1. **Path objects are Strings.** They have all String methods plus
-   resolution methods.
-2. **`find` does not produce.** It only checks existence. Use `produce` to
-   create missing files.
-3. **Map order matters.** The first match wins, so order maps by priority.
-4. **Extension alternatives are checked.** If `file.txt` doesn't exist,
-   `.gz`, `.bgz`, and `.zip` variants are checked automatically.
-
-## Extension points
-
-### Custom path maps
-
-Add maps for application-specific directories:
+## Finding every candidate: `find_all` / `glob_all`
 
 ```ruby
-Path.add_path(:my_app_data, "/opt/myapp/{SUBPATH}")
-Path.map_order = Path.map_order.dup.unshift(:my_app_data)
+Path.setup('data/config.yaml').find_all
+# => every location in map_order where the file exists (uniqued)
+
+Path.setup('data/*').glob_all
+# => Path#glob over each map result; annotated with original/where
 ```
 
-### Custom map templates with substitution
+`glob` on a `located?` path calls `Dir.glob` directly; on an unlocated path
+it delegates to `glob_all`.
 
-Maps can use `{PATH/old/new}` for path component replacement:
+## Reversing the process: `identify` and `relocate`
+
+`Resource.identify(path)` maps a located path back to an unlocated one by
+matching each map template as a regexp (dropping `:current`); the shortest
+candidate wins, and `$HOME` is folded back to `~`. `Resource.relocate(path)`
+returns the existing path if it exists, otherwise identifies and re-finds it.
 
 ```ruby
-Path.add_path(:converted, "/cache/{PATH/data/converted}")
+Resource.identify(File.join(ENV['HOME'], '.scout', 'data', 'config'))
+# => "data/config"
+Resource.relocate(File.join(ENV['HOME'], '.scout', 'data', 'config'))
+# => re-resolved through find
 ```
 
-When resolving `data/file`, this produces `/cache/converted/file`.
+## Digest names and `etc`/`tmp` helpers
 
-### Resource integration
+`Path#digest_str` produces a stable digest for a file or directory (used for
+caching); for a directory with more than 10 files it uses a count plus an
+MD5 of the file list, otherwise the MD5 of each file. See
+[Caching Results](../user/CachingResults.md).
 
-Paths tied to a Resource module can produce themselves. See
-[Persistence and Resources](PersistenceAndResources.md).
-
-## Interactions with other subsystems
-
-- **Open** — `Open.read`, `Open.open`, etc. resolve Path objects via
-  `path.find` before accessing the file.
-- **Resource** — Resource-backed paths trigger production on `produce` or
-  when accessed with `exists?(produce: true)`.
-- **Persist** — Persist uses Path for cache_dir and lock_dir configuration.
-- **TmpFile** — TmpFile.tmp_for_file uses Path patterns for temp directory
-  structure.
-
-## Common pitfalls
-
-### find returns nil, not false
+Resource helpers: `Scout.etc`, `Scout.tmp`, `Scout.share`, ... are
+`Path#method_missing` segment builders over `Scout`'s own path (`Scout` is
+itself a Resource with `pkgdir 'scout'`), so they produce unlocated
+sub-paths that `find`/`follow(:user)` resolve under `$HOME/.scout`:
 
 ```ruby
-path = Path.setup("nonexistent")
-path.find     # => nil
-path.exists?  # => false
-
-# Don't use find in boolean context without nil check
-if path.find  # truthy check works because nil is falsy
-  ...
-end
+Scout.etc                # => "etc"           (unlocated, pkgdir Scout)
+Scout.etc.find           # => "$HOME/.scout/etc"
+Scout.etc['path_maps'].find # => "$HOME/.scout/etc/path_maps"
 ```
 
-### Map order is not set once
-
-`map_order` can be modified at runtime. Code that runs before you change it
-uses the old order. Set map order early, ideally during initialization.
-
-### Extension alternatives can surprise
-
-If you have both `data.txt` and `data.txt.gz`, `find` returns whichever
-appears first in map order, not necessarily the uncompressed version.
+`Scout.etc` is not a statically defined method: it resolves through
+`Resource#method_missing` (resource.rb:69) into `Path#method_missing`
+(path.rb:45) segment building, the same mechanism as any other segment
+(`Scout.tmp`, `Scout.share`, ...).
 
 ## Related
 
-- [Architecture](Architecture.md) — How Path fits in the module dependency
-  graph.
-- [Persistence and Resources](PersistenceAndResources.md) — How Resource
-  extends Path with production.
-- For detailed code investigation, see
-  [`../../research/io-paths-analysis.md`](../../research/io-paths-analysis.md).
+- [Producing Resources](../user/ProducingResources.md) — claims and produce
+  on top of `find`.
+- [Working with Files](../user/WorkingWithFiles.md) — `Open` I/O that
+  consumes `Path`s.
+- [Architecture](Architecture.md) for the module dependency graph.

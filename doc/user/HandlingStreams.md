@@ -1,210 +1,236 @@
 # Handling Streams
 
-This guide explains how to work with streams in scout-essentials — the
-IO-like objects returned by command execution, file streaming, and piping
-operations. You'll learn about the stream lifecycle: joining, aborting,
-callbacks, and error propagation.
+When `CMD.cmd(..., :pipe => true)` or `Open.open_pipe` hands you an IO, that
+object has been extended with `ConcurrentStream`: it carries the producer
+thread(s) and pid(s) that feed it, plus callbacks and an abort protocol. This
+page is the user-facing contract; the internals are in
+[Streaming Model](../developer/StreamingModel.md).
 
-## When to use this
-
-- You're working with command output in pipe mode.
-- You're building pipelines that chain multiple commands.
-- You need to handle stream errors and cleanup safely.
-- You want to understand when and why to call `join`.
-
-## Concepts
-
-### What is a stream?
-
-In scout-essentials, a "stream" is a regular IO object (like a pipe from a
-subprocess) extended with lifecycle management. It knows about the threads
-and processes that produce it, and provides methods to wait for them,
-detect failures, and clean up.
+## Anatomy
 
 ```ruby
-stream = CMD.cmd("generate_data", pipe: true)
-# stream is an IO, but also has:
-#   stream.join    — wait for producers
-#   stream.abort   — kill producers
-#   stream.joined? — check if joined
+io = CMD.cmd('grep x', :pipe => true)
+io.threads        # => [input thread, stderr thread, ...]  (producer side)
+io.pids           # => [pid]
+io.callback       # => nil or a Proc run on successful join (see :post)
+io.abort_callback # => nil or a Proc run on abort(exception)
+io.std_err        # => "" (filled by :save_stderr)
+io.log            # => last stderr line (pipe mode, when :log => true)
+io.lock, io.lockfile, io.pair, io.next, io.filename, io.autojoin, io.no_fail
 ```
 
-### The stream lifecycle
+Attributes come from `ConcurrentStream.setup` (concurrent_stream.rb:12-70) and
+`CMD.cmd` sets `:pids`, `:threads`, `:autojoin` (default `no_fail`) and
+`:no_fail` on the returned stream. `exit_status` exists but is *not* reliable
+after a normal read+join — it stays `nil` because only `join_pids` sets it, and
+that method empties `pids` when it runs; see
+[Running Commands](RunningCommands.md) for the probe.
 
-A stream goes through these phases:
+## `close` vs `join` vs abort
 
-1. **Creation** — CMD or Open creates a pipe and starts the producer.
-2. **Reading** — The consumer reads from the stream.
-3. **Joining** — The consumer calls `join` to wait for the producer.
-4. **Completion** — Producers finish, callbacks run, locks release.
+- **`join`** is the finishing move: `join_threads`, `join_pids`, raise
+  `stream_exception` if one is set, run `join_callback` (the composed callback),
+  close, release the lock, and mark `joined?`. It never joins `@pair` — the
+  other end of an internal pipe is the producer's business.
+- **`close`** on an `autojoin` stream performs `super` (the plain IO close) and
+  then joins if the stream is at EOF; with `autojoin` off it just closes.
+  Closing early while a producer still writes raises `IOError`/`Errno::EPIPE`
+  in the producer, which the stream converts to an abort — so for an early,
+  deliberate stop use `abort`, not `close`.
+- **`abort(exception)`** is the safe early close: it marks the stream aborted,
+  extends it with the `AbortedStream` marker, runs `abort_callback`, interrupts
+  and joins every producer thread, sends `SIGINT` to every pid, clears the
+  callbacks, **propagates to `@pair`** (aborting the other pipe end), closes and
+  unlocks. It is idempotent (a second call only logs). Threads get
+  `Aborted.new` raised in them, so producer bodies should rescue `Aborted`.
+- **`force_close` does not exist** in this repo. The only reference is a dead
+  `respond_to?` guard inside `Open.grep` (open/util.rb:26); a plain IO has no
+  such method (probe `tmp/rewrite_B/probe_13_force_close.rb`: `IO#respond_to?
+  (:force_close) => false`). The early-close tool is `abort`.
 
-### Why joining matters
-
-When you read a stream to EOF, you've consumed all the data. But the
-producer process may still be running, or it may have exited with an error.
-Calling `join` ensures the producer has finished and checks its exit status.
-
-```ruby
-stream = CMD.cmd("important_command", pipe: true)
-stream.read  # data is consumed
-stream.join  # raises ProcessFailed if the command failed
-```
-
-## Basic usage
-
-### Reading and joining
-
-```ruby
-# Create a stream
-stream = CMD.cmd("seq 1 10", pipe: true)
-
-# Read all output
-output = stream.read
-
-# Join to check exit status
-stream.join
-```
-
-### Iterating over lines
-
-```ruby
-stream = CMD.cmd("cat data.txt", pipe: true)
-stream.each_line do |line|
-  process(line)
-end
-stream.join
-```
-
-### Autojoin
-
-When `autojoin: true` is set, the stream joins itself when the consumer
-reaches EOF or closes the stream:
-
-```ruby
-stream = CMD.cmd("seq 1 100", pipe: true, autojoin: true)
-stream.read  # EOF triggers join automatically
-```
-
-This is convenient but means any failure will raise during reading, not
-during an explicit join call.
-
-## Building pipelines
-
-### Chaining commands
-
-```ruby
-# Generate → filter → sort, all streaming
-generator = CMD.cmd("generate_data", pipe: true)
-filter    = CMD.cmd("grep pattern", in: generator, pipe: true)
-sorter    = CMD.cmd("sort", in: filter, pipe: true)
-
-result = sorter.read
-sorter.join
-filter.join
-generator.join
-```
-
-### Simplified piping with Open
-
-```ruby
-# Open.pipe creates a pipe between commands
-stream = Open.pipe("generate_data", "grep pattern", "sort")
-result = stream.read
-stream.join
-```
-
-## Error handling
-
-### Default behavior: raise on failure
+Consumers should follow this rescue contract:
 
 ```ruby
 begin
-  stream = CMD.cmd("failing_command", pipe: true)
-  stream.read
-  stream.join  # raises ConcurrentStreamProcessFailed
-rescue ProcessFailed => e
-  puts "Command failed: #{e.message}"
+  data = Open.consume_stream(stream, false, dst)   # or .each / .read
+rescue Aborted, AbortedStream
+  # deliberate stop: log and move on; the stream is already aborted+closed
+rescue ConcurrentStreamProcessFailed => e
+  # a producer failed; e.pid / e.msg available
 end
 ```
 
-### Suppressing failures
-
-```ruby
-stream = CMD.cmd("may_fail", pipe: true, no_fail: true)
-stream.read
-stream.join  # does not raise
-stream.exit_status  # => non-zero exit code
-```
-
-### Aborting a stream
-
-If something goes wrong on the consumer side, you can abort the stream to
-kill producer threads and processes:
-
-```ruby
-stream = CMD.cmd("long_running", pipe: true)
-begin
-  some_processing(stream)
-rescue => e
-  stream.abort  # kill the producer
-  raise
-end
-```
-
-## Paired streams
-
-When CMD runs a command, it creates two streams: stdout and stderr. These
-are "paired" — aborting one will abort the other.
-
-```ruby
-stream = CMD.cmd("verbose_command", pipe: true, save_stderr: true)
-stream.read
-stream.join
-stream.std_err  # captured stderr content
-```
+`AbortedStream` is a *marker module* (`concurrent_stream.rb:4-9`) —
+`AbortedStream.setup(obj, exception)` extends an object so later code can read
+`obj.exception` and recover the real cause; `sensible_write` uses exactly that.
 
 ## Callbacks
 
-You can attach callbacks to a stream — procs that run after the producer
-finishes successfully:
+- `stream.add_callback(&block)` **composes**: it wraps the existing callback so
+  the *new* block runs *after* the old one (probe
+  `tmp/rewrite_B/probe_19_streaming_apis.rb`: `add_callback order:
+  [:first, :second]`). `ConcurrentStream.setup(stream, &block)` also composes in
+  that order, which is why calling setup twice on the same stream is safe.
+- `callback` / `abort_callback` are plain accessors over single chained procs
+  (built by setup when you pass `:callback` / `:abort_callback` options or a
+  block). There is **no `add_abort_callback`** — assign `abort_callback = proc
+  { |exception| ... }` (only the last one wins unless you compose by hand).
+- `join` runs the composed `callback`; `abort` runs `abort_callback` with the
+  exception and then discards both callbacks.
 
 ```ruby
-stream = CMD.cmd("generate", pipe: true) do |stream_obj|
-  # This runs after join, if successful
-  Log.info "Generation complete"
+s = Open.open_pipe { |sin| sin.puts 'x' }
+s.add_callback { puts 'a' }
+s.add_callback { puts 'b' }     # runs after 'a'
+s.join                          # prints "a\nb"
+```
+
+## Helpers in `Open`
+
+### `Open.consume_stream(io, in_thread = false, into = nil, into_close = true, &block)`
+
+Pumps the stream to completion and returns the last chunk read. `Path` inputs
+are ignored, closed streams are joined and skipped. With `into` (an IO, or a
+String/Path file path whose parent dirs are created) it writes every chunk
+there; `into_close` (default true) closes `into` when it responds to `close`.
+On `Aborted` or any exception it aborts the source, closes `into`, **removes the
+partial output file** and re-raises. With `in_thread: true` the whole drain runs
+in a new thread that is pushed onto `io.threads`. The block runs after a
+successful drain. Verified: `probe_19_streaming_apis.rb` (`consume_stream
+return: "data"`, `consume_stream into path: "into-file\n"`).
+
+### `Open.sensible_write(path, content, options = {}, &block)`
+
+Atomic write into a lock-protected tmp file followed by a rename. Key
+behaviours for streams:
+
+- When the content is a stream, an `Aborted` raised while copying is
+  **swallowed** (`Log.low "Aborted sensible_write"`), the stream is aborted and
+  the target is deleted; the partial tmp file is always removed in `ensure`.
+- A non-Aborted exception recovers the *original* upstream cause from an
+  `AbortedStream`-marked content (`content.exception`) and re-raises that,
+  deleting the target. See
+  [Streaming Model](../developer/StreamingModel.md) for the marker.
+- After a successful copy the content stream is joined (but not if it is a
+  `Path` or already joined).
+
+Verified: P25/P33 in `research/behavior-probes.md` ("Aborted in
+sensible_write: NOT raised (swallowed); partial tmp left: 0").
+
+### `Open.open_pipe(do_fork = false, close = true, &block)`
+
+Creates a pipe and returns the **read end** (`sout`), with the block executed in
+a producer thread that writes the other end (`sin`).
+
+- **Block arity**: the block always receives `sin` whether it declares a
+  parameter or not (arity 0 blocks simply ignore it). Verified:
+  `probe_20_open_pipe_arity.rb` (`arity-0 block: "arity0\n"`, `arity-1: "w\n"`).
+- **No block** raises `RuntimeError "No block given"`.
+- **Fork mode** (`do_fork: true`) runs the block in a child process instead of
+  a thread: the child purges registered input pipes, closes `sout`, yields,
+  `exit! 0`; the parent closes `sin` and sets the pid on `sout` via
+  `ConcurrentStream.setup(sout, :pids => [pid])` — no threads, no callbacks.
+  `close: false` in the child leaves `sin` open after the block returns
+  (verified: `fork mode: "from-fork\n"`, `fork noclose: "fork-noclose\n"`).
+- **Thread mode** pairs the two ends (`pair`), runs the block through
+  `ConcurrentStream.process_stream` (close+join on exit, abort on error), and
+  registers the thread on both ends. An exception in the block aborts the
+  stream and re-raises at the consumer.
+
+### `Open.pipe`
+
+Takes **no arguments** and returns the raw `[sout, sin]` pair from `IO.pipe`
+(plus registering `sin` in `OPEN_PIPE_IN`). Calling it with a positional
+argument raises `ArgumentError` (probe `probe_19_streaming_apis.rb`:
+`Open.pipe positional: ArgumentError`). There is no multi-command helper here —
+chain commands by feeding one stream into `:in` of the next `CMD.cmd`.
+
+### `Open.tee_stream(stream)` / `tee_stream_thread_multiple(stream, num)`
+
+Returns an **Array** of streams (`num` copies, default 2): the first is the
+"main" copy with `autojoin: true`, the rest have no autojoin. A splitter thread
+reads the source once and writes every chunk to all copies; the main copy's
+callback joins the source and closes the extra write ends, and its
+`abort_callback` propagates an abort to the source and the other copies.
+Verified: P31/P33 and `probe_19_streaming_apis.rb` (`tee_stream count: 2`,
+`tee[0].autojoin => true`, `tee[1].autojoin => nil`).
+
+```ruby
+main, copy = Open.tee_stream(CMD.cmd('gzip -c', :pipe => true, :in => input))
+# write copy to disk while main feeds the next command, then join copy
+```
+
+### `Open.line_monitor_stream(stream, &block)`
+
+Builds a tee, then a monitor thread reads the monitor copy line by line calling
+`block.call(line)` — the block therefore runs **concurrently** with whoever
+consumes the returned stream, not after. Failures in the block abort the monitor
+and are re-raised into the returned stream (`out.raise $!` when supported). The
+returned stream is the second copy, annotated from the source and set up with
+the monitor thread. Verified: P33 and `probe_19_streaming_apis.rb`.
+
+### `Open.read_stream(stream, size)`
+
+Blocking read of exactly `size` bytes (plain `stream.read(missing)` loop,
+`lib/scout/open/stream.rb:401`), raising `ClosedStream` if EOF is reached
+first. Useful for binary framing; `probe_19_streaming_apis.rb` shows
+`read_stream(4) => "0123"`.
+
+### `Open.sort_stream(stream, header_hash: '#', cmd_args: nil, memory: false)`
+
+Streams `header_hash`-prefixed lines straight through, then sorts the rest.
+`memory: false` (default) pipes the remainder into `env LC_ALL=C sort
+<cmd_args>` (`-u` by default when `cmd_args` is nil) and consumes that stream
+into the output; `memory: true` reads the whole remainder, sorts it in Ruby and
+writes it out. Everything runs inside `ConcurrentStream.process_stream`, so the
+source is closed+joined and aborted on error. Verified:
+probe_19_streaming_apis.rb: feeding `"# header\nc\na\nb\n"` returns
+`"# header\na\nb\nc\n"` — the header passes through untouched, the rest is
+sorted.
+
+### `Open.collapse_stream(s, line: nil, sep: "\t", header: nil, compact: false, &block)`
+
+Merges consecutive lines sharing the same first field, joining the other
+columns with `|` (or dropping empty parts when `compact: true`). An optional
+block receives the accumulated column array and its return value becomes the
+row payload. Verified: `probe_19_streaming_apis.rb`.
+
+## `Open.open` block form and `DontClose`
+
+```ruby
+res = Open.open(file) do |io|
+  next io.read if io.is_a?(String)          # IO/StringIO pass straight through
+  raise DontClose.new(io.read)              # payload escapes, io still closes
 end
-
-stream.read
-stream.join  # callback runs after join
 ```
 
-## Common mistakes
+`Open.open` yields and **always closes and joins** the IO afterwards (the
+`ensure` at open.rb:70-77). Raising `DontClose` with a payload makes the block
+form *return* the payload instead of the IO, while still closing — it is an
+early-return mechanism, not a way to keep the handle. Verified:
+`probe_21_dontclose.rb` (`DontClose returns payload: "payload"`, `closed after
+DontClose: true`). Any other exception aborts, joins and re-raises the stream.
 
-### Not joining after reading
+## Progress bars
 
-```ruby
-# RISKY: failure goes undetected
-stream = CMD.cmd("important", pipe: true)
-stream.read
-# no join — if the command failed, you won't know
+Pass `:progress_bar` (a `Log::ProgressBar`, `lib/scout/log/progress.rb`; the option key is `:progress_bar` — there is no `:bar` key)
+to `CMD.cmd` and each stderr line ticks it (`bar.process(line)` at cmd.rb:643):
+`probe_24_bar.rb` counts 2 ticks for a 2-line stderr, in both pipe and
+non-pipe mode. With `:log => true` (`CMD.cmd_log`) the stderr text is also
+recorded in `stream.log`. `Log::ProgressBar` itself supports `:process =>
+proc{|elem| elem.length}` so a tick can be weighted per element.
 
-# RIGHT: always join
-stream.read
-stream.join
-```
+## Where the diagnostics go
 
-### Aborting without cleanup
+Log output (including severity-logged stderr lines) goes to the Log logfile /
+STDERR. **`std_err` is the per-stream capture**, filled by `:save_stderr` — see
+[Running Commands](RunningCommands.md#save-stderr--capture-stderr-instead-of-logging-it).
+There is no "paired stderr stream" object; in pipe mode stderr is drained by a
+thread inside `CMD.cmd`.
 
-When you abort a stream, any paired streams are also aborted. Make sure you
-handle cleanup in rescue blocks.
+## Related
 
-### Blocking forever with non-closing streams
-
-If a producer never closes the stream (e.g., `tail -f`), reading will block
-forever. Use `read_nonblock` or set a timeout on the join.
-
-## See also
-
-- [Running Commands](RunningCommands.md) — CMD creates streams.
-- For the internal ConcurrentStream model, see
-  [Streaming Model](../developer/StreamingModel.md).
+- [Running Commands](RunningCommands.md) — how these streams are produced.
+- [Streaming Model](../developer/StreamingModel.md) — setup, join/abort
+  internals, exception propagation.
+- [Working with Files](WorkingWithFiles.md) — `Open.read/write` on top.

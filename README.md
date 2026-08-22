@@ -1,136 +1,107 @@
 # scout-essentials
 
-scout-essentials is the core library of the Scout framework. It provides a small, focused set of primitives used across the rest of the Scout ecosystem: process/stream management, file and path utilities, persistence and caching, logging and progress reporting, lightweight annotations for objects, and simple option parsing. The additional, domain-level functionality lives in companion packages such as `scout-gear`, `scout-ai`, etc. — see the mikisvaz GitHub account for those repositories.
+scout-essentials is a small Ruby library (gem `scout-essentials`, [VERSION](VERSION)) that provides the shared substrate the other Scout repositories are built on: path and resource resolution, persistence/caching, file and stream I/O, command execution, streaming, annotations, logging and progress reporting, configuration, CLI-option parsing, remote data access and locking.
 
-This README points you to the key modules, shows quick usage patterns and explains where to find more detailed documentation in the `doc/` directory.
+It deliberately contains no CLI executable, no TSV handling, no workflow engine and no job scheduler. Runtime dependencies are only `term-ansicolor`, `yaml`, `rake` and `listen` ([scout-essentials.gemspec](scout-essentials.gemspec)); it depends on no other scout-family or rbbt-family gem at runtime.
 
-## Overview
+## Central abstractions
 
-Core capabilities included in scout-essentials:
+| Abstraction | What it is |
+|---|---|
+| `Path` / `Resource` | `Path` is a `String` carrying annotations that resolves logical names (`data/config.yaml`) to real locations through configurable *path maps*; `Resource` modules declare claims over those paths and `produce` them on demand |
+| `Persist` | typed on-disk caching: `Persist.persist(key, type) { ... }` with per-type serialization drivers, staleness invalidation (`:update`/`:check`), an in-memory cache and lock-protected recompute |
+| `Open` | one interface for local, compressed (`.gz`/`.bgz`/`.zip`) and remote (`http(s)://`, `ssh:`) file and stream I/O, including atomic `sensible_write` and the `wget`/`rsync` remote cache |
+| `CMD` | the subprocess layer: `CMD.cmd` for shell and no-shell commands, stdin piping, timeouts, stderr capture and external-tool bootstrap |
+| `ConcurrentStream` | an `IO` extended with the producer threads/pids that feed it, plus join/abort callbacks — the lifecycle layer behind every pipe |
+| `Annotation` / `AnnotatedObject` / `AnnotatedArray` | a mixin that attaches named metadata to ordinary Ruby objects (Strings, Arrays, Hashes) without changing their class; the mechanism `Path`, `Resource` and `NamedArray` are built on |
+| `Log` / `Log::ProgressBar` | a severity-gated logger writing to STDERR (constants `Log::DEBUG … Log::NONE`) plus stacked progress bars rendered in the same place; colors via `term-ansicolor` |
+| `Scout::Config` | a flat `key -> [tokens, value]` registry where, among the entries whose token matches the caller's context, the one with the lowest priority number wins |
+| `SOPT` | a minimal option parser: options declared as a single string, a **destructive** consumer that edits `ARGV` in place, no subcommands and no coercion beyond booleans |
+| `TmpFile` | scratch files and directories under `$HOME/tmp/scout`, with `·`-flattened names and a 150-character cap |
+| `IndiferentHash` | a `Hash` extended so String and Symbol keys are interchangeable, plus the options-processing helpers built on it |
+| `NamedArray` | Arrays with named positions (`NamedArray.setup(arr, [:a, :b])`), giving both positional and field-name access |
+| `Misc` | small load-bearing helpers: the `Misc.format` family, `timespan`, digests, `insist`, filesystem and process utilities |
+| `Lockfile` / `Open.lock` | `Open.lock(file, &block)` is the locking primitive, built on the vendored `Lockfile` at `lib/scout/open/lock/lockfile.rb`; there are three lock namespaces under `$HOME/.scout/tmp` |
 
-- Process and stream management with safe concurrency: `ConcurrentStream`, `CMD`
-- Robust file/stream I/O and remote access: `Open`
-- File/path abstraction and package-oriented lookup: `Path`, `Resource`
-- Atomic persistence and caching: `Persist`, `TmpFile`
-- Logging, color output and progress reporting: `Log`
-- Lightweight typed annotations on arbitrary objects: `Annotation`, `NamedArray`
-- Flexible indifferent Hash and option helpers: `IndiferentHash`, `SimpleOPT` (SOPT)
+`require 'scout-essentials'` is the only entry point (`lib/scout-essentials.rb`); it loads the modules above plus `Open::NamedStream` and the exceptions (`Aborted`, `DontClose`, `ParameterException`, …). `NamedArray` and `Hook` are not auto-loaded and must be required explicitly.
 
-Each module is documented in the repository `doc/` directory; see the "Documentation" section below for direct links.
+## Getting started
 
----
+```ruby
+require 'scout-essentials'
+
+Open.write('tmp/data.txt', "1\n2\n")   # creates parent directories
+Log.info "wrote 2 lines"
+Persist.persist('count', :integer) { Open.read('tmp/data.txt').lines.count }
+```
+
+Documentation lives in the [`doc/`](doc/StartHere.md) directory — start with [doc/StartHere.md](doc/StartHere.md).
+
+## Relationship to the other Scout repositories
+
+scout-essentials is the lowest layer of the Scout stack; everything above it is implemented in separate repositories:
+
+- **scout-gear** — adds TSV, `Workflow`/`Task`/`Step`, the `scout` CLI and `scout_commands/` dispatch, and the scheduler/HPC layer (SLURM/PBS/LSF, orchestrators) on top of essentials. It declares `scout-essentials` as a runtime dependency.
+- **scout-camp** — deploys workflows to the cloud: offsite/terraform/AWS provisioning around the CLI. Its bin loads scout-gear's `bin/scout`; the scheduler logic itself lives in gear.
+- **scout-rig** — consumes essentials' `Path`/`Resource` machinery at the code level (`require 'scout'`, `Path.add_path`); its gemspec does not declare the essentials edge.
+- **scout-ai** — reaches essentials transitively, via scout-rig and its own `require 'scout'`; it declares no direct dependency on essentials.
+
+Attribution facts worth keeping straight (verified against installed gem sources; see the attribution table in [Architecture](doc/developer/Architecture.md)):
+
+| Concept | Where it actually lives |
+|---|---|
+| `TSV`, `TSV::Dumper`, `Annotation.tsv`, `Workflow`/`Task`/`Step`, `.info` files, the `scout` CLI and `scout_commands/` | scout-gear |
+| scheduler / HPC (SLURM, PBS, LSF, orchestrators) | scout-gear (scout-camp adds the cloud/offside deploy layer) |
+| `Misc.notify` / `Misc.send_email` and the `Bgzf` block API | legacy rbbt-util **only** — scout-essentials references them without a require or gemspec edge, so they are `NoMethodError`/`NameError` in an essentials-only install |
+| `deep_indifferent` | does not exist anywhere in the audited ecosystem |
+| rbbt-util `require_instead` shims | rbbt-util 6.0.5 redirects ~30 requires onto scout files; the *dependency direction* at gemspec level is UNVERIFIED |
 
 ## Documentation
 
-Full module-level documentation is shipped in `doc/`. The most important documents are:
+22 Markdown pages under [`doc/`](doc/StartHere.md).
 
-- doc/Annotation.md — add typed annotations to objects and arrays; AnnotatedArray
-- doc/CMD.md — process execution, streaming, tool discovery and helper wrappers
-- doc/ConcurrentStream.md — concurrent stream lifecycle, joining, aborting and callbacks
-- doc/IndiferentHash.md — string/symbol indifferent Hash helpers and options utilities
-- doc/Log.md — logging, colors, fingerprinting and ProgressBar
-- doc/NamedArray.md — small record-like arrays with named fields and fuzzy matching
-- doc/Open.md — unified file/stream I/O, remote fetch (wget/ssh), atomic writes, sync
-- doc/Path.md — Path helpers, mapping, finding and extension utilities
-- doc/Persist.md — typed serialization, persistence/caching and `Persist.persist`
-- doc/Resource.md — resource production, claim/produce and rake-based producers
-- doc/SimpleOPT.md — small option parsing and usage generation (SOPT)
-- doc/TmpFile.md — temporary file/dir helpers and stable cache path generator
+Entry points:
 
-Open those files for detailed API descriptions, examples and notes.
+- [Start Here](doc/StartHere.md) — installation, the single require, what loads and what does not, what is *not* in this repo
+- [Improvements](doc/Improvements.md) — running log of known misbehaviours (bug log, not a roadmap)
 
----
+User guides:
 
-## Quick start (examples)
+- [Annotating Data](doc/user/AnnotatingData.md) — attaching metadata to objects
+- [Working with Files](doc/user/WorkingWithFiles.md) — `Open` I/O, compression, grepping, atomic writes, locking, `TmpFile`
+- [Remote Data](doc/user/RemoteData.md) — HTTP(S)/FTP/SSH fetch, the URL cache, rsync helpers
+- [Running Commands](doc/user/RunningCommands.md) — `CMD.cmd`, piping, timeouts, stderr, tool bootstrap
+- [Handling Streams](doc/user/HandlingStreams.md) — using `ConcurrentStream` objects: join, abort, callbacks
+- [Caching Results](doc/user/CachingResults.md) — `Persist.persist`, serialization types, invalidation, in-memory cache
+- [Producing Resources](doc/user/ProducingResources.md) — the `claim` syntax and `produce`
+- [Logging and Progress](doc/user/LoggingAndProgress.md) — `Log`, severity, colors, fingerprints, progress bars
+- [Command-Line Options](doc/user/CommandLineOptions.md) — `SOPT`
+- [Cookbook](doc/user/Cookbook.md) — short executed recipes combining the modules
 
-These short snippets show typical usage patterns — the docs in `doc/` contain more detail and examples.
+Developer guides:
 
-Annotation:
-```ruby
-module Tag
-  extend Annotation
-  annotation :code, :note
-end
+- [Architecture](doc/developer/Architecture.md) — module dependency graph, load order, ecosystem boundaries
+- [Design Principles](doc/developer/DesignPrinciples.md) — composition by annotation, and the other repo-wide conventions
+- [Annotation System](doc/developer/AnnotationSystem.md) — the internals of annotations
+- [Path Resolution](doc/developer/PathResolution.md) — path maps, map order, `find`/`follow`, `Resource#method_missing`
+- [Persistence and Resources](doc/developer/PersistenceAndResources.md) — the `Persist` and `Resource#produce` write contracts
+- [Streaming Model](doc/developer/StreamingModel.md) — how `ConcurrentStream` is built and how errors travel
+- [Configuration](doc/developer/Configuration.md) — `Scout::Config` token priorities
+- [Error Handling](doc/developer/ErrorHandling.md) — the exception taxonomy and the control-flow signals
+- [Locking and Concurrency](doc/developer/LockingAndConcurrency.md) — the vendored `Lockfile` and the three lock namespaces
+- [Core Utilities](doc/developer/CoreUtilities.md) — `IndiferentHash`, `NamedArray`, `Misc`, `TmpFile` naming, `Hook`
 
-s = "hello"
-Tag.setup(s, :code)    # s.code -> :code
-s2 = "other"
-s.annotate(s2)         # copies annotations
+## Development and testing
+
+```sh
+bundle install
+rake test                                 # whole suite
+rake test TEST=test/scout/test_open.rb    # one file
+ruby -Ilib -Itest test/scout/test_misc.rb # run a file directly
 ```
 
-Open (reading a file, auto-decompress):
-```ruby
-content = Open.read("data.tsv.gz")
-```
-
-Persist (cache a computed value):
-```ruby
-value = Persist.persist("my-result", :json, dir: Path.setup("var/cache")) do
-  expensive_computation()
-end
-```
-
-CMD + ConcurrentStream (run a pipeline):
-```ruby
-io = CMD.cmd("tail -n 100", :in => some_file_io, :pipe => true)
-io2 = CMD.cmd("grep foo", :in => io, :pipe => true)
-puts io2.read
-io2.join
-```
-
-Log + ProgressBar:
-```ruby
-Log::ProgressBar.with_bar(100, desc: "Working") do |bar|
-  100.times { bar.tick; work_item }
-end
-```
-
-Path + Resource:
-```ruby
-# Resource modules typically claim resources and produce them on demand.
-# Accessing a Path calls produce, so opening a resource Path triggers creation.
-p = Path.setup("share/data/myfile", 'mypkg')
-p.produce
-Open.read(p)
-```
-
----
-
-## Running tests
-
-The test suite exercises the modules (unit tests use Test::Unit). To run the tests in this repository, use your normal Ruby test runner; the test files are under `test/` — examples:
-
-```bash
-# from repository root
-ruby -Ilib test/scout/test_tmpfile.rb
-# or run the whole suite with your preferred runner
-```
-
-Tests in the suite show practical usages and edge cases for the provided utilities.
-
----
-
-## Related projects
-
-scout-essentials is intentionally focused on low-level primitives. Higher-level, domain-specific functionality is implemented in companion projects maintained on the mikisvaz GitHub account (look for repositories named `scout-gear`, `scout-ai`, etc.). Those packages build on what you find here to provide workflows, tools and integrations.
-
-GitHub: https://github.com/mikisvaz  
-Look for repositories that begin with `scout-` (e.g. `scout-gear`, `scout-ai`).
-
----
-
-## Contributing
-
-Contributions and improvements are welcome. Please follow the repository contribution guidelines (if present) or submit issues / pull requests on the project repository.
-
-If you extend or reuse code from this package in companion packages, prefer to keep core primitives here and implement domain logic in separate modules/packages (as done by the Scout ecosystem).
-
----
+The `test` task is defined in the [Rakefile](Rakefile) (`Rake::TestTask`, pattern `test/**/test_*.rb`, which matches 49 files on disk: 47 test files (one of which, `test/scout/log/test_color.rb`, is empty) plus the two `test_helper.rb` files, one of which itself defines `TestMiscHelper`). Tests are plain `Test::Unit` and mirror the `lib/scout/` layout. The gemspec is generated by juwelier from the Rakefile — regenerate it with `rake gemspec` rather than editing it.
 
 ## License
 
-See the repository LICENSE (if present) for licensing information.
-
----
-
-If you need help finding a specific API, open the corresponding file in `doc/` (listed above) or search the `lib/` tree for concrete implementations and tests in `test/` for usage examples.
+MIT-style license, Copyright (c) 2023 Miguel Vazquez — see [LICENSE.txt](LICENSE.txt).
