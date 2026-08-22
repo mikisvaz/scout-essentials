@@ -297,4 +297,214 @@ line33
     # Without :timeout the behaviour is unchanged: the caller waits
     assert_equal("done\n", CMD.cmd("bash -c 'sleep 0.2; echo done'").read)
   end
+
+  def stderr_emitting_command(lines = 3, sleep_time = 0.3, pause_after = 0)
+    "bash -c '#{(1..lines).map{|i| "sleep #{sleep_time}; echo error#{i} >&2"}.join('; ')}; sleep #{pause_after}'"
+  end
+
+  def test_save_stderr_pipe_string_file_lives_tails
+    Log.with_severity 6 do
+      TmpFile.with_file(".log", false) do |tmp|
+        # The child also prints stdout lines that the parent consumes slowly,
+        # so the pipe is genuinely being consumed while stderr reaches the log
+        cmd = "bash -c 'sleep 0.2; echo error1 >&2; echo out1; sleep 0.4; echo error2 >&2; echo out2; sleep 0.4; echo error3 >&2; echo out3'"
+        io = CMD.cmd(cmd, :pipe => true, :stderr => 0, :save_stderr => tmp)
+        assert ! io.closed?
+
+        # Poll the log size while reading stdout one line at a time: the file
+        # must grow before the command ends, proving incremental flushing
+        sizes = []
+        lines = []
+        while line = io.gets
+          lines << line
+          sleep 0.1
+          sizes << File.size(tmp) if File.exist?(tmp)
+        end
+        io.join
+
+        assert_equal %w(out1 out2 out3), lines.map(&:chomp)
+        assert(sizes.any?{|s| s > 0}, "log file should grow while the command runs: #{sizes.inspect}")
+        # Sizes must be non-decreasing, and more than one positive size means
+        # the file was already being filled before the command finished
+        assert_equal(sizes.sort, sizes, "log file size must not shrink: #{sizes.inspect}")
+        assert(sizes.count{|s| s > 0} >= 2, "log file should have been flushed several times while running: #{sizes.inspect}")
+        assert io.closed?
+        content = File.read(tmp)
+        assert_equal "error1\nerror2\nerror3\n", content
+        assert_equal "error1\nerror2\nerror3\n", io.std_err
+      end
+    end
+  end
+
+  def test_save_stderr_pipe_scout_path
+    Log.with_severity 6 do
+      tmp = Path.setup(File.join(TmpFile.tmpdir, 'scout_path_stderr.log'))
+      CMD.cmd("bash -c 'echo error1 >&2; echo error2 >&2'", :pipe => true, :stderr => 0, :save_stderr => tmp).read
+      assert_equal "error1\nerror2\n", File.read(tmp.find)
+      assert(File.exist?(tmp.find))
+    end
+  end
+
+  def test_save_stderr_pipe_pathname
+    Log.with_severity 6 do
+      TmpFile.with_file(".log", false) do |tmp|
+        pathname = Pathname.new(tmp)
+        CMD.cmd("bash -c 'echo error1 >&2; echo error2 >&2'", :pipe => true, :stderr => 0, :save_stderr => pathname).read
+        assert_equal "error1\nerror2\n", File.read(tmp)
+      end
+    end
+  end
+
+  def test_save_stderr_pipe_io_is_not_closed
+    Log.with_severity 6 do
+      TmpFile.with_file(".log", false) do |tmp|
+        io_dst = File.open(tmp, 'w')
+        CMD.cmd("bash -c 'echo error1 >&2; echo error2 >&2'", :pipe => true, :stderr => 0, :save_stderr => io_dst).read
+        assert ! io_dst.closed?
+        io_dst.close
+        assert_equal "error1\nerror2\n", File.read(tmp)
+      end
+
+      string_io = StringIO.new
+      CMD.cmd("bash -c 'echo error1 >&2'", :pipe => true, :stderr => 0, :save_stderr => string_io).read
+      assert ! string_io.closed?
+      assert_equal "error1\n", string_io.string
+    end
+  end
+
+  def test_save_stderr_pipe_file_closed_by_cmd
+    Log.with_severity 6 do
+      TmpFile.with_file(".log", false) do |tmp|
+        fds_before = Dir["/proc/self/fd/*"].length
+        CMD.cmd("bash -c 'echo error1 >&2; echo error2 >&2'", :pipe => true, :stderr => 0, :save_stderr => tmp).read
+        Misc.insist(10, 0.05) do
+          raise "fd leaked" unless Dir["/proc/self/fd/*"].length <= fds_before + 1
+        end
+        fds_after = Dir["/proc/self/fd/*"].length
+        assert(fds_after <= fds_before + 1, "CMD should close the file it opened: #{fds_before} -> #{fds_after}")
+
+        # A second run truncates correctly: proves the previous run closed it
+        CMD.cmd("bash -c 'echo only >&2'", :pipe => true, :stderr => 0, :save_stderr => tmp).read
+        assert_equal "only\n", File.read(tmp)
+      end
+    end
+  end
+
+  def test_save_stderr_nonpipe_path
+    Log.with_severity 6 do
+      TmpFile.with_file(".log", false) do |tmp|
+        CMD.cmd("bash -c 'echo error1 >&2; echo error2 >&2'", :save_stderr => tmp, :stderr => 0)
+        assert_equal "error1\nerror2\n", File.read(tmp)
+      end
+    end
+  end
+
+  def test_save_stderr_nonpipe_io
+    Log.with_severity 6 do
+      string_io = StringIO.new
+      CMD.cmd("bash -c 'echo error1 >&2'", :save_stderr => string_io, :stderr => 0)
+      assert_equal "error1\n", string_io.string
+      assert ! string_io.closed?
+    end
+  end
+
+  def test_save_stderr_boolean_still_populates_std_err
+    Log.with_severity 6 do
+      io = CMD.cmd("bash -c 'echo error1 >&2'", :pipe => true, :stderr => 0, :save_stderr => true)
+      io.join
+      assert_equal "error1\n", io.std_err
+
+      out = CMD.cmd("bash -c 'echo error1 >&2'", :save_stderr => true, :stderr => 0)
+      assert_equal "error1\n", out.std_err
+
+      out = CMD.cmd("bash -c 'echo error1 >&2'", :stderr => 0)
+      assert ! out.respond_to?(:std_err) || out.std_err.nil? || out.std_err.empty?
+    end
+  end
+
+  def test_save_stderr_timeout_keeps_file
+    Log.with_severity 6 do
+      TmpFile.with_file(".log", false) do |tmp|
+        assert_raise(CMD::Timeout) do
+          CMD.cmd("bash -c 'echo error1 >&2; sleep 5'", :pipe => true, :stderr => 0, :save_stderr => tmp, :timeout => 0.5).read
+        end
+        Misc.insist(3, 0.2, 'timeout log file to be flushed') do
+          raise "missing #{tmp}" unless File.exist?(tmp)
+        end
+        assert(File.exist?(tmp))
+        assert_equal "error1\n", File.read(tmp)
+
+        # The destination was closed even though the command timed out
+        fds_before = Dir["/proc/self/fd/*"].length
+        assert_equal(fds_before, Dir["/proc/self/fd/*"].length)
+      end
+    end
+  end
+
+  def test_save_stderr_nonpipe_failure_writes_log
+    Log.with_severity 6 do
+      TmpFile.with_file(".log", false) do |tmp|
+        assert_raise(ProcessFailed) do
+          CMD.cmd("bash -c 'echo error1 >&2; exit 3'", :save_stderr => tmp, :stderr => 0)
+        end
+        # The ProcessFailed message embeds stderr and the destination keeps it
+        # even though the command failed
+        assert(File.exist?(tmp))
+        assert_equal "error1\n", File.read(tmp)
+      end
+    end
+  end
+
+  def test_save_stderr_spawn_failure_closes_destination
+    Log.with_severity 6 do
+      TmpFile.with_file(".log", false) do |tmp|
+        3.times do |i|
+          assert_raise(ProcessFailed) do
+            CMD.cmd(['/no/such/binary_xyz'], :save_stderr => tmp, :stderr => 0)
+          end
+          # No fd still points at the destination file: CMD closed what it
+          # opened even though the command never started (the popen3 pipes
+          # themselves are pre-existing noise here, they are not related to
+          # the destination)
+          leaked = Dir["/proc/self/fd/*"].select do |fd|
+            (File.readlink(fd) rescue nil) == tmp
+          end
+          assert(leaked.empty?, "destination fd leaked on spawn failure: #{leaked.inspect}")
+        end
+
+        # And the path is reusable: a later write is not clobbered by a
+        # buffered handle left behind
+        File.open(tmp, 'w') { |f| f.write "marker\n" }
+        assert_equal "marker\n", File.read(tmp)
+      end
+    end
+  end
+
+  def test_save_stderr_creates_parent_dirs
+    Log.with_severity 6 do
+      subdir = File.join(TmpFile.tmpdir, 'missing1', 'missing2')
+      tmp = File.join(subdir, 'log.txt')
+      assert ! File.exist?(subdir)
+      CMD.cmd("bash -c 'echo error1 >&2'", :save_stderr => tmp, :stderr => 0)
+      assert File.exist?(tmp)
+      assert_equal "error1\n", File.read(tmp)
+    end
+  end
+
+  def test_save_stderr_unwritable_path_raises
+    Log.with_severity 6 do
+      TmpFile.with_file("blocked", false) do |blocked|
+        File.open(blocked, 'w') do |f| f.puts 'not a dir' end
+        bad = File.join(blocked, 'sub', 'log.txt')
+
+        raised = false
+        begin
+          CMD.cmd("echo x", :save_stderr => bad, :stderr => 0)
+        rescue Exception
+          raised = true
+        end
+        assert raised, "an unwritable path must raise, not be silently ignored"
+      end
+    end
+  end
 end
