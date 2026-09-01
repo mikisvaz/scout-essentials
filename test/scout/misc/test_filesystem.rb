@@ -54,5 +54,15 @@ class TestFilesystem < Test::Unit::TestCase
       end
     end
   end
+
+  def test_path_relative_to
+    path = '/some/path/dir1/foo'
+    dir = '/some/path/'
+
+    assert_equal 'dir1/foo', Misc.path_relative_to(dir, path)
+
+    path = '/some/path/dir1/dir2/dir3/dir4/foo/'
+    assert_equal 'dir1/dir2/dir3/dir4/foo/', Misc.path_relative_to(dir, path)
+  end
 end
 
