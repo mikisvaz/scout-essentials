@@ -14,7 +14,7 @@ module Misc
     path = File.expand_path(path) unless path.slice(0,1) == "/"
     basedir = File.expand_path(basedir) unless basedir.slice(0,1) == "/"
 
-    basedir += "/" unless basedir[-1] == "/"
+    basedir += "/" unless basedir.slice(-1,1) == "/"
 
     if path.start_with?(basedir)
       return path.slice(basedir.length, path.length)
