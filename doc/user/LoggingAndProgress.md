@@ -19,8 +19,6 @@ unrecognised value — falls back to `Log.default_severity`, which reads
 `~/.scout/etc/log_severity` if that file exists and is `INFO` otherwise
 (log.rb:23-34).
 
-Verified by `tmp/rewrite_C/probe_04_log_severity.rb` (out04.txt): ladder
-order, `Log.severity == 4` with no env/file, `Log.with_severity(level){}`
 restoring the original value after the block.
 
 Change it at runtime with `Log.severity = Log::DEBUG`, or scope a block with
@@ -38,7 +36,7 @@ Change it at runtime with `Log.severity = Log::DEBUG`, or scope a block with
 - `Log::LAST` is one shared mutable `String` (starts as `"log"`, never frozen)
   used as a protocol between `logn` and progress-bar printing so bars know how
   many lines to move up and which kind of output came last
-  (`progress/report.rb` `print`/`report`). Probe out04.txt confirms
+  (`progress/report.rb` `print`/`report`).
   `class == String`, `frozen? == false`.
 
 ## Message forms
@@ -46,8 +44,8 @@ Change it at runtime with `Log.severity = Log::DEBUG`, or scope a block with
 - `Log.debug "msg"` .. `Log.error "msg"` print when severity allows; the top
   of the ladder is the `Log::NONE` constant, not a method.
 - `Log.debug { "expensive " + build }` — **the block is lazy message
-  evaluation, not a timer**: it is only called if the level passes. Probe
-  (out05.txt): a counter incremented inside a block passed to `Log.debug`
+  evaluation, not a timer**: it is only called if the level passes. A
+  counter incremented inside a block passed to `Log.debug`
   stays at 0 under ERROR severity and reaches 1 under DEBUG severity.
 - `Log.exception(e)` (log.rb:254) prints `BACKTRACE` lines derived from
   `e.backtrace` after fingerprinting messages longer than 1000 chars; it
@@ -55,7 +53,7 @@ Change it at runtime with `Log.severity = Log::DEBUG`, or scope a block with
   it contains `NOSTACK`.
 - `Log.stack(stack)` (log.rb:318) prints a magenta header then the stack
   **reversed** (innermost frame first) unless `SCOUT_ORIGINAL_STACK=true`.
-  Probe (out05.txt): a caller list `a.rb:1, b.rb:2, c.rb:3` prints as
+  A caller list `a.rb:1, b.rb:2, c.rb:3` prints as
   `c.rb:3`, `b.rb:2`, `a.rb:1`.
 
 ## Top-level debug helpers (defined on Object)
@@ -66,7 +64,7 @@ DEBUG. `ddd/lll/mmm/iii/wwww/eee` inspect an object at the matching severity,
 and the `f`-suffixed variants (`ddf`, `llf`, `mmf`, `iif`, `wwwf`, `eef`)
 fingerprint it first. `sss(level[, &blk])` sets or scopes severity. `ccc`
 (log.rb:439) enables `$scout_debug_log` around a block so nested `ccc` calls
-print. Probe out05.txt confirms all five are top-level methods defined inside
+print. All five are top-level methods defined inside
 `lib/scout/log.rb`.
 
 ## Colors
@@ -90,7 +88,7 @@ show first/middle/last elements; hashes longer than 10 fall back to
 keys+values fingerprints; floats get 1/3/6 decimals depending on magnitude.
 
 The signature is `fingerprint(obj)` — **one positional argument**; there are no
-`max_length`/`sep` options (probe_05). Hash rendering separates pairs with a
+`max_length`/`sep` options . Hash rendering separates pairs with a
 space, not a comma: `Log.fingerprint({a: 1, b: 2, c: 3})` gives
 `"{:a=>1 :b=>2 :c=>3}"`.
 
@@ -130,13 +128,13 @@ bytes/process/callback/severity` accessors.
   movement. `report_msg` shows **elapsed time and rate** and, when `max` is
   set, an ETA: `· <rate> per sec. -- <dots> <pct>% <eta> => <elapsed> -
   <ticks> of <max> items · <desc>`; with no `max` the ETA part is replaced
-  by `<ticks> items` (probe_12 shows both forms).
+  by `<ticks> items`; both forms occur.
 - `add_offset` / `remove_offset` / `offset` (util.rb:9-28) indent bars created
   in nested threads.
 - `file:` option: `save` writes the bar state to YAML (`:desc, :last_count,
   :last_percent, :last_time, :max, :start, :ticks`) and `done`/`error` remove
   the file, so a bar given a `file:` **resumes across runs** — the persisted
-  YAML is reloaded into `ticks` (probe_06 round-trips 3 ticks).
+  YAML is reloaded into `ticks` (round-trips 3 ticks).
 
 All bar bookkeeping is guarded by `BAR_MUTEX`; per-bar `tick` state is not
 synchronized and races by design.
@@ -147,7 +145,7 @@ synchronized and races by design.
 `Hash`. In a plain `require 'scout-essentials'` process neither `TSV` nor
 `Step` exists, so the `when TSV` arm raises `NameError`, the rescue turns it
 into `nil`, and **`guess_obj_max` always returns `nil`** — i.e.
-`get_obj_bar(list, true).max == nil` (probe_06). Pass an explicit Numeric or a
+`get_obj_bar(list, true).max == nil` . Pass an explicit Numeric or a
 `:max` hash, or define those constants in the embedding repo, to get a real
 max.
 

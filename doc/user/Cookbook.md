@@ -1,10 +1,7 @@
 # Cookbook
 
 Short, self-contained recipes that combine the scout-essentials modules.
-Every snippet here was executed; the backing probes are listed under each
-heading and live in `tmp/rewrite_C/` (older probes in `tmp/rewrite_A/`,
-`tmp/rewrite_B/` are referenced by their P-numbers, which map to
-`research/behavior-probes.md`).
+Every snippet here was executed against the current `lib/scout/`.
 
 The theme of the library: plain objects annotated with provenance, paths
 resolved from a declaration, work cached on disk, streams piped without
@@ -31,8 +28,8 @@ produced (a type like `:string`/`:proc`, literal contents, or a block); the
 claimed `Path` is annotated and its `produce` materialises it into the
 resource tree (`lib/scout/resource/path.rb:2`,
 `lib/scout/resource/produce.rb`). `produce_and_find` produces when needed and
-returns `self.find`. Probe: `tmp/rewrite_C/probe_03_cookbook.rb`
-(`claim` + first/second call returning the same path, `Open.read` content).
+returns `self.find` (first and second call return the same path, `Open.read`
+yields the claimed content).
 
 ## Cache invalidation with `:update` and `:check`
 
@@ -51,7 +48,7 @@ d = Persist.persist('dependent', :marshal,
 ```
 
 `:update => true` always re-runs the block; `:check` names a file whose mtime
-invalidates the entry. Probe: probe_03 (a == b, block not re-run; `:update`
+invalidates the entry (a == b, block not re-run; `:update`
 re-runs; `:check` path resolves).
 
 ## Fetch a remote file
@@ -95,7 +92,7 @@ restored.tissue               # => "Liver"
 
 `Annotation.setup(obj, "A|B", hash)` is the module-level deserialiser; the
 `"A|B"` string is split on `|` and each name is looked up as a constant. An
-unknown type name is **warned about and skipped** (probe_03 prints
+unknown type name is **warned about and skipped** (the run prints
 `Annotation NoSuchAnnotation not defined` on STDERR, then
 `Annotation.setup('S004', 'NoSuchAnnotation', ...)` returns the plain
 un-annotated string). `serialize` produces a plain `Hash` with `:literal`,
@@ -138,7 +135,7 @@ rescue Aborted, AbortedStream
 end
 ```
 
-Probe: probe_03 (open_pipe data, tee_stream producing a real gzip file).
+(open_pipe data, tee_stream producing a real gzip file).
 See [Handling Streams](HandlingStreams.md) and the
 [Streaming Model](../developer/StreamingModel.md).
 
@@ -193,7 +190,7 @@ SOPT.require(options, :organism)   # ParameterException when nil
 ```
 
 The `*` marks an option as **taking a string value**; without it the option is
-a boolean. Probe: probe_02 (options hash, `argv_left == ["positional"]`,
+a boolean. (options hash, `argv_left == ["positional"]`,
 `SOPT.require` raising). See
 [Command-Line Options](CommandLineOptions.md).
 

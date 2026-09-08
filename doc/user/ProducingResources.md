@@ -34,7 +34,6 @@ module MyApp
 end
 ```
 
-
 - `claim(path, type, content = nil, &block)` — `type` is a **mandatory
   positional** argument (`claim path { }` raises `ArgumentError`). Passing
   only the path plus a block is not a valid call.

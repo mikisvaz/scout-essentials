@@ -26,7 +26,6 @@ CMD.cmd('echo', 'arg2', '-n' => true, '-r' => true).read
 - **Hash-only** (`CMD.cmd({'echo' => 'x'})`) is *not* a command form; the Hash is
   treated as options, `cmd`/`tool` stay nil and the call fails.
 
-Verified: probe `tmp/rewrite_B/probe_15_cmd_forms.rb` (string, string+cmd,
 array, array+string, symbol tool with nil cmd, ProcessFailed on hash-only).
 
 ### The `'{opt}'` placeholder
@@ -44,8 +43,6 @@ CMD.cmd("echo '{opt}' a 1", 'x' => 1).read # => "a 1\n"  (note: trailing space)
 
 Unquoted `{opt}` is left untouched — the substitution matches `'\{opt\}'`
 exactly. Without a placeholder the option string is appended to the command.
-Verified: probe `probe_14_cmd_opts.rb` lines 10-11 and the C8 fix in
-`research/doc_audit/RunningCommands.md`.
 
 ## Option quoting: `process_cmd_options`
 
@@ -71,10 +68,10 @@ raises `Invalid option key` before anything runs.
 **Arrays are not expanded.** An Array value is stringified (`to_s`) and quoted
 like any other value — `"#{value}"` produces `n '["a", "b"]'` in String mode
 and `['n', '["a", "b"]']` in array mode. Pass separate calls or build the
-command yourself if you need repeated flags. Verified: `probe_14_cmd_opts.rb`
+command yourself if you need repeated flags.
 lines 4-5 and the cmd-level Array check.
 
-Verified examples: `probe_14_cmd_opts.rb` (dashes, `=`, nil/false, true,
+(dashes, `=`, nil/false, true,
 apostrophes, invalid key, arrays).
 
 ## stderr: severities, capture and files
@@ -83,7 +80,7 @@ apostrophes, invalid key, arrays).
 (added by `cmd.rb:181`) is **`Log::DEBUG`** — stderr lines are only logged at
 debug severity, i.e. invisible unless you raise `Log.severity` above it.
 
-- `:stderr => true` is normalised to `Log::HIGH` (probe `probe_23_bar_log.rb`).
+- :stderr => true is normalised to `Log::HIGH`.
 - Any other Integer is a `Log` severity: the ladder is
   `DEBUG=0, LOW=1, MEDIUM=2, HIGH=3, INFO=4, WARN=5, ERROR=6, NONE=7`
   (`lib/scout/log.rb` `SEVERITY_NAMES`), so `:stderr => Log::MEDIUM` shows
@@ -118,9 +115,7 @@ CMD.cmd(..., :save_stderr => dst)                     # dst stays open
 Implementation: `cmd.rb:194-217` (destination setup), the writer thread /
 inline writer, and the `ensure` at `cmd.rb:600-612` that flushes and closes a
 CMD-owned file. Verified by `test/scout/test_cmd_save_stderr.rb` (13 tests,
-incl. live `tail -f` polling) and probes `probe_17_save_stderr.rb`
-(boolean/String/Path/Pathname/IO/StringIO, pipe and non-pipe, truncation) and
-`probe_16_exitstatus.rb` (`std_err` populated in both modes).
+incl. live `tail -f` polling).
 
 ## Exit status, `no_fail` and failure
 
@@ -129,19 +124,19 @@ incl. live `tail -f` polling) and probes `probe_17_save_stderr.rb`
   `:nofail`) is given.
 - `:no_fail => true` **suppresses** `ProcessFailed`/`ConcurrentStreamProcessFailed`
   — and `exit_status` then stays `nil`, in pipe mode too. If you need the code,
-  call `join_pids` yourself. Verified: `probe_16_exitstatus.rb`
+  call `join_pids` yourself.
   (`pipe read+join exit_status: nil`, `explicit join_pids exit_status: 0`,
   `non-pipe exit_status: 0`).
 - `exit_status` is only ever set by `ConcurrentStream#join_pids`
   (`concurrent_stream.rb:127`), which also empties `pids`, so it can only be
   used once. A stream that is read and joined normally has `exit_status == nil`
-  (probe `probe_26_join_es.rb`: `read+join: es=nil` with `joined?` true; only
+  (`read+join: es=nil` with `joined?` true; only
   an explicit early `join_pids` yields `0`). Do not rely on `stream.exit_status`.
 - If the process never starts (bad executable, no such file) `ProcessFailed` is
   raised immediately — also suppressed by `no_fail`, which then returns `nil`.
 - A failed *producer thread* in pipe mode surfaces as
   `ConcurrentStreamProcessFailed` when the consumer closes/joins the stream
-  (`probe_13_force_close.rb`).
+ 
 
 ## Timeout
 
@@ -182,7 +177,8 @@ returns only entries matching `/\d+\./`.
 
 | key | effect |
 |---|---|
-| `:in` | stdin: a String is written by a thread; an IO/StringIO is read; a ConcurrentStream is streamed (and closed unless `:dont_close_in`). Also `:in_pipe` for a pipe-backed writer. Verified: `probe_25_keeping_in.rb` (String, IO, stream, `in_pipe` returns an IO). |
+| `:in` | stdin: a String is written by a thread; an IO/StringIO is read; a ConcurrentStream is streamed (and closed unless `:dont_close_in`). Also `:in_pipe` for a pipe-backed writer. (String, IO, stream, `in_pipe` returns an IO)
+. |
 | `:pipe` | return a ConcurrentStream instead of the text/StringIO |
 | `:stderr` | severity for stderr logging (default `Log::DEBUG`); `true` → `Log::HIGH` |
 | `:save_stderr` | `true` / path / IO — see above |
@@ -191,7 +187,7 @@ returns only entries matching `/\d+\./`.
 | `:no_wait` | alias used to default `autojoin` (`autojoin = no_wait if autojoin.nil?`) |
 | `:timeout` | seconds; watchdog; only runtime bound |
 | `:post` | proc run after the command/stream finishes (teardown, forcing upstream closes) |
-| `:progress_bar` | a `Log::ProgressBar`; stderr lines tick it (`probe_24_bar.rb`: 2 ticks in both pipe and non-pipe mode) |
+| `:progress_bar` | a `Log::ProgressBar`; stderr lines tick it (2 ticks for a 2-line stderr, pipe and non-pipe) |
 | `:log` | defaults to `true` (`log = true if log.nil?`, cmd.rb:224): pipe-mode stderr lines are `Log.log`ged at the chosen `:stderr` severity. `:log => false` silences that logging. Not the same as `CMD.cmd_log` (a separate helper that forces `:pipe`/`:log`). |
 | `:sudo`, `:xvfb` | prefix the command |
 | `:dont_close_in` | keep the `:in` stream open |
@@ -201,13 +197,12 @@ returns only entries matching `/\d+\./`.
 `CMD.cmd` in this repo — `cmd.rb` deletes none of them, so they would be
 forwarded to `process_cmd_options` and end up as command-line text. `:canfail`
 exists on `Persist` (`persist.rb:133`) and on `Resource` claims, not here.
-Verified by grepping `lib/` for the four names (`probe_25_keeping_in.rb` tail).
+Verified by grepping `lib/` for the four names.
 
 ## The block is ignored
 
 `CMD.cmd(...) { ... }` accepts a block but **never calls it** — the only block
-invocation inside `cmd.rb` is in `CMD.tool`. Verified live by
-`tmp/docaudit/probe_hs_c15_block.rb`: in both pipe and non-pipe mode the block
+invocation inside `cmd.rb` is in `CMD.tool`. In both pipe and non-pipe mode the block
 body never runs, while `:post` and `stream.add_callback` do. Use
 `:post => proc{}` or stream callbacks for post-join work.
 

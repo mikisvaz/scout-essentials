@@ -51,7 +51,6 @@ every token it recognises:
 - `--` stops the whole loop: everything after it is left in `args`.
 
 ```ruby
-# probe_02 (tmp/rewrite_C/probe_02_sopt.rb)
 argv = ['-o', 'Human', '--tissue', 'Liver', 'positional', '-d']
 SOPT.consume(argv)
 # => {:organism=>"Human", :tissue=>"Liver", :"dry-run"=>true}
@@ -75,8 +74,7 @@ Booleans are true unless the value is one of `F`, `false`, `FALSE`, `no`
   `=` instead — this convenience swallows the next token, so use `=`.
 
 A word that merely *follows* a boolean flag and is not one of those four is
-**not** eaten: `['--dry-run', 'stray']` leaves `"stray"` in `ARGV`
-(probe_02).
+**not** eaten: `['--dry-run', 'stray']` leaves `"stray"` in `ARGV`.
 
 ## State and reuse
 
@@ -88,7 +86,7 @@ A word that merely *follows* a boolean flag and is not one of those four is
 - `SOPT::GOT_OPTIONS`, a module-level hash that is **merged into, never
   reset**. Every `consume` call accumulates there, which is how
   sub-commands that each declare their own inputs still end up with a
-  global picture of what was given (probe_02: two separate `consume` calls
+  global picture of what was given (two separate `consume` calls
   on disjoint inputs both appear in `GOT_OPTIONS`).
 
 `SOPT.get(opt_str)` is just `parse` followed by `consume(ARGV)`.
@@ -103,7 +101,7 @@ SOPT.require(options, :organism, :tissue)
 # raises ParameterException: Parameter 'tissue' not given
 ```
 
-`ParameterException < ScoutException < StandardError` (probe_02), so plain
+`ParameterException < ScoutException < StandardError`, so plain
 `rescue` works. There is **no** variant that extracts a subset of the
 options — `SOPT.get` always parses a fresh string and consumes the whole
 `ARGV`.
@@ -128,8 +126,8 @@ myprog [--organism=<string>] [--tissue=<string>] [--dry-run[=false]]
 
 The header really is `## SYNOPSYS` — the misspelling is in the source
 (`simple_opt/doc.rb:112`) and callers grep for it; do not "fix" it in your
-matching code. `SOPT.usage` prints the doc and calls `exit 0` (probe_07 traps
-`SystemExit` and reports status 0).
+matching code. `SOPT.usage` prints the doc and calls `exit 0` (trapping
+`SystemExit` reports status 0).
 
 `SOPT.input_doc` (used by `doc`) is also the public way to format an
 explicit option list, and `SOPT.input_array_doc` formats
@@ -145,25 +143,24 @@ searches for a free one:
 
 1. an existing shortcut already bound to that exact long name is reused;
 2. if the long name contains `-` or `_`, the initials of its parts
-   (`--max-cpu` → `-m` if free, else the accumulated initials);
+  (`--max-cpu` → `-m` if free, else the accumulated initials);
 3. if it contains digits, the first letter plus the number;
 4. otherwise it walks forward through the letters.
 
 If no shortcut can be found, `fix_shortcut` returns `nil` and the option
 simply has no short form. **Collisions are silent**: declaring `-a--alpha`
 and `-a--also` yields `{"a"=>"alpha", "al"=>"also"}` — the second entry
-gets a longer shortcut rather than an error (probe_02). Live probe
-(`tmp/rewrite_C/probe_07_sopt_extra.rb`): registering `t` while `-t` is
+gets a longer shortcut rather than an error: registering `t` while `-t` is
 bound to `tissue` yields `"th" => "threshold"`; `another_one` gets the
 initials `"ao"`; `alpha2` gets `"a2"`.
 
 `SOPT.delete_inputs(['organism'])` removes an input from `inputs`,
 `input_shortcuts`, `shortcuts`, `input_types`, `input_defaults` and
 `input_descriptions` (`simple_opt/accessor.rb:39`). `input_shortcuts` is the
-reverse map `{'organism'=>'o'}` (probe_07).
+reverse map `{'organism'=>'o'}`.
 
 `SOPT.reset` clears **only** `shortcuts` and the internal `all` registry;
-`inputs` and the other per-input tables survive (probe_02). Call
+`inputs` and the other per-input tables survive. Call
 `SOPT.delete_inputs(SOPT.inputs.dup)` if you actually want an empty slate.
 
 ## Quirks to design around

@@ -6,9 +6,7 @@ changing their class or wrapping them. This page is the user-facing view of the
 system; internals and design notes are in
 [Annotation System](../developer/AnnotationSystem.md).
 
-Every example below was run against the current `lib/scout/` (probes
-P36–P42 in `research/behavior-probes.md` plus
-`tmp/rewrite_C/probe_01..04.rb` and `probe_09_annotated_array.rb`).
+Every example below was run against the current `lib/scout/`.
 
 ## Defining an annotation
 
@@ -41,7 +39,7 @@ annotated = SampleInfo.setup(name, organism: 'Human')
 annotated.equal?(name)   # => true
 ```
 
-Two consequences, both live-probed (probe_02):
+Two consequences:
 
 - a **frozen** object is `dup`ed first, so `setup` returns a different,
   unfrozen copy — always use the return value;
@@ -88,7 +86,7 @@ Annotation.setup('S003', 'SampleInfo', sample.annotation_hash)
 ```
 
 The type argument may be a `"A|B"` String of module names (unknown names are
-only `Log.warn`ed and skipped, probe_01) or an Array of module objects.
+only `Log.warn`ed and skipped) or an Array of module objects.
 
 `#serialize` produces the plain Hash (`annotation_info` merged with
 `:literal`) consumed by the `:annotation` persistence driver. There is **no
@@ -104,8 +102,7 @@ in this gem.
 
 `NamedArray` (`lib/scout/named_array.rb`) is a separate annotation module
 that gives an Array named fields. It needs its **explicit**
-`require 'scout/named_array'` — `scout-essentials.rb` does not load it
-(probe_03):
+`require 'scout/named_array'` — `scout-essentials.rb` does not load it:
 
 ```ruby
 require 'scout/named_array'
@@ -116,7 +113,7 @@ row[:organism]  # => "Human"
 row['tissue']   # => "Liver"
 ```
 
-Signatures (probe_04): `NamedArray.setup(array, names, *rest)` — the names are
+Signatures: `NamedArray.setup(array, names, *rest)` — the names are
 a positional Array, **not** a `key:` keyword.
 
 ### Access is via `method_missing`
@@ -137,7 +134,7 @@ positionally by name.
 ### Array methods shadow field names
 
 If a field is called `first`, `last`, `count`, `zip`, `sample` … the real
-`Array` method wins (probe_10):
+`Array` method wins:
 
 ```ruby
 row2 = NamedArray.setup(%w[a b c], %w[first second third])
@@ -158,14 +155,13 @@ field → value.
 
 Watch out for `id` — `annotation_id` (aliased `id`) is defined by the
 annotation system itself, so a field named `id` collides and the digest is
-returned instead (probe_10).
+returned instead.
 
 ## `AnnotatedArray` — elements inherit the container's annotations
 
 Annotate the *container*, then `extend AnnotatedArray`, and every element
 handed out by `[]`, `first`, `last`, `each`, `collect`, `select`, `compact`,
-`uniq`, `flatten`, `reverse`, `sort_by`, `subset`, `remove` is re-annotated
-(probe_09):
+`uniq`, `flatten`, `reverse`, `sort_by`, `subset`, `remove` is re-annotated:
 
 ```ruby
 samples = SampleInfo.setup(%w[S001 S002 S003], organism: 'Human')
@@ -177,7 +173,7 @@ samples.collect { |s| s.length }   # [4, 4, 4], elements annotated
 samples.select { |s| s != 'S002' } # re-annotated array
 ```
 
-Not overridden — **annotations are dropped** (probe_09, method owners are
+Not overridden — **annotations are dropped** (method owners are
 `Array`/`Enumerable`): `map`, `zip`, `+`, `filter_map`, `flat_map`,
 `each_slice`, `values_at`. `zip` in particular does not propagate annotations
 to the *other* operand's elements.

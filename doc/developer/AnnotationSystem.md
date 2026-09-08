@@ -6,16 +6,12 @@ makes `Path`, `Resource` and `NamedArray` work, so understanding it is a
 prerequisite for [Path Resolution](PathResolution.md) and
 [Persistence and Resources](PersistenceAndResources.md).
 
-Everything on this page is backed by `tmp/rewrite_C/probe_01..04.rb` and
-probes P36–P42 in `research/behavior-probes.md`, run against the current
-`lib/scout/annotation*.rb`.
-
 ## Load path
 
 `lib/scout-essentials.rb` does **not** require `scout/annotation` directly.
 `Annotation` becomes available because `scout/path` requires it
 (`lib/scout/path.rb:1`), so `require 'scout-essentials'` gives you the
-constant (`Object.const_defined?(:Annotation) => true`, probe_03) — but a
+constant (`Object.const_defined?(:Annotation) => true`) — but a
 library that only wants annotations can `require 'scout/annotation'` on its
 own.
 
@@ -49,7 +45,7 @@ SampleInfo.setup('S004', %w[Human Liver])          # positional, same order
 SampleInfo.setup { 'S005' }                         # block-as-object
 ```
 
-Rules verified in probe_01/probe_02:
+Rules:
 
 - **In-place extension.** `setup` calls `obj.extend SampleInfo` on the object
   you pass and returns **that same object** (`setup(s).equal?(s) => true`) —
@@ -60,7 +56,7 @@ Rules verified in probe_01/probe_02:
   `setup` rescues it and returns the *plain* object with no metadata.
 - **`:annotation_types` is reserved.** Each annotated object gets an
   `@annotation_types` array; declaring `annotation :annotation_types` collides
-  with it (probe_01: writing to it raised `NoMethodError` against `nil`).
+  with it; writing to it raised `NoMethodError` against `nil`.
 
 ## Introspection and serialisation
 
@@ -108,7 +104,7 @@ s.annotation_id     # => "860c73f490edb8115064663b7f579d73"
 - `Annotation.setup(obj, "A|B", hash)` — the generic deserialiser. The type
   string is split on `|`, each name resolved with `Object.const_get`. **Unknown
   names only warn and are skipped** (`Log.warn "Annotation NoSuchAnnotation not
-  defined"`, probe_01) — no exception.
+  defined"`) — no exception.
 
 ### Instance-side helpers
 
@@ -123,10 +119,10 @@ s.annotation_id     # => "860c73f490edb8115064663b7f579d73"
 
 ## Round-trips and copies
 
-- **Marshal round-trips** annotations (P42, probe_01): the singleton modules
+- **Marshal round-trips** annotations: the singleton modules
   survive dump/load.
-- **Only `dup` loses them; `clone` keeps them** (probe_02:
-  `dup is_annotated? => false`, `clone is_annotated? => true, .a => 1` —
+- **Only `dup` loses them; `clone` keeps them**
+  (`dup is_annotated? => false`, `clone is_annotated? => true, .a => 1` —
   `clone` copies the singleton class, `dup` does not): to re-annotate a `dup`
   copy the metadata explicitly with `annotation_hash` →
   `Annotation.setup` / `MyModule.setup`, or call `#annotate` on the copy.
@@ -147,7 +143,7 @@ arr.first.organism     # => "Human"
 Overrides provided in `lib/scout/annotation/array.rb`:
 
 - `[]` `(pos, clean = false)` — the element is re-annotated unless the second
-  argument is truthy, in which case it is returned clean (probe_09: a fresh
+  argument is truthy, in which case it is returned clean (a fresh
   array's `fresh[0, true]` is an un-annotated `String` while `fresh[1]` is
   annotated);
 - `first`, `last`, `each_with_index`, `each`, `inject`, `collect`, `select` —
@@ -156,8 +152,7 @@ Overrides provided in `lib/scout/annotation/array.rb`:
 - `subset(list)`, `remove(list)` — set operations (`&`, `-`) with
   re-annotation.
 
-**Limits** — live probe `tmp/rewrite_C/probe_09_annotated_array.rb` (method
-owners plus actual results): `map`, `zip`, `filter_map`, `flat_map`,
+**Limits** (method owners audited against `lib/`): `map`, `zip`, `filter_map`, `flat_map`,
 `each_slice`, `values_at` and `count` are **not overridden** (their owner is
 `Array`/`Enumerable`) and return plain results with no annotations — `ary.map
 { |x| x }` yields `[false, false, false]` under `Annotation.is_annotated?`,
@@ -165,7 +160,7 @@ while `ary.each` yields `[true, true, true]`, and `zip` keeps annotations only
 on the container-side elements.
 
 **Requirement:** elements must be extendable. `AnnotatedArray` over an Array
-of `Integer`s raises `TypeError: can't define singleton` (probe_09) — use
+of `Integer`s raises `TypeError: can't define singleton` — use
 Strings or other extendable objects.
 
 ## NamedArray is a separate thing

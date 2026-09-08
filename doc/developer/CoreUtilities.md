@@ -14,8 +14,6 @@ The small modules everything else in the stack is built on:
 type and every `Hash` operation still works. Reads and writes are
 indifferent between String and Symbol keys.
 
-Verified by `tmp/rewrite_D/probe_06_indiferent_misc.rb`:
-
 ```ruby
 h = IndiferentHash.setup({ 'a' => 1 })
 h[:b] = 2
@@ -38,7 +36,7 @@ h.keys     # => ["a", "b"]      (first-written form is kept)
 ### The destructive pair
 
 `process_options(hash, *keys)` **destroys** the keys it extracts — it
-`delete`s them (verified: `process_options(opts, :a, :b)` leaves
+`delete`s them (`process_options(opts, :a, :b)` leaves
 `{:extra=>3}`). `pull_keys(hash, :prefix)` returns the sub-hash under that
 prefix key AND removes it from the original
 (`pull_keys({persist: true, x: 1}, :persist)` => `{:persist=>true}`, hash
@@ -56,8 +54,7 @@ in the coercion list — see the asymmetry below.
 (`/\w+=(\"[^\"]*\"|[^\s\"]+)/`), strips surrounding quotes, and splits a
 value containing a comma into an Array. Its coercion ladder is shorter than
 `string2hash`'s: `true`/`false` are **not** special-cased at all, so both
-survive as Strings (verified `tmp/rewrite_D/probe_20_parse_options_false.rb`:
-`parse_options('a=false')` => `{"a"=>"false"}`,
+survive as Strings (`parse_options('a=false')` => `{"a"=>"false"}`,
 `parse_options('a=1,b=2')` => `{"a"=>["1", "b=2"]}` — the comma split eats
 the second pair — and `parse_options('a="x y"')` => `{"a"=>"x y"}`).
 `print_options(options)` is the inverse, re-quoting values with spaces.
@@ -67,11 +64,10 @@ branch (`options.rb:110`) is dead code for the plain case: `a=false` goes
 through `options[key] = value` and the String survives. The only way the
 branch is reached is when `false` is the *value* of a pair that the default
 `#` separator has already split off — and the executed result is still
-`"false"` in every probed form (`tmp/rewrite_D/probe_21_s2h_false_traced.rb`).
+the executed result is still `"false"` in every form.
 `parse_options` has no boolean branches at all. `Scout::Config.get`, by
 contrast, turns a stored `'false'` into the boolean `false` (see
-[Configuration.md](Configuration.md)). Verified by
-`tmp/rewrite_D/probe_19_false_coercion.rb` and `probe_20_parse_options_false.rb`:
+[Configuration.md](Configuration.md)).
 
 ```text
 string2hash('a=true')            => {"a"=>true}
@@ -94,7 +90,7 @@ single pair because the separator never appears — the value is the literal
 `IndiferentHash.serializable(obj)` (`serialize.rb`) returns a deep copy of
 Hash/Array structures. Arrays longer than 100 are truncated: first 70 +
 `'...'` + last 30 + the marker `"TRUNCATED only 100 out of N shown"`
-(probe_06: 250-element array => 102 elements, marker last). Use it for
+(250-element array => 102 elements, marker last). Use it for
 logging fingerprints, not for round-tripping data.
 
 ### CaseInsensitiveHash
@@ -104,8 +100,7 @@ logging fingerprints, not for round-tripping data.
 `values_at` are overridden; writes are plain `Hash` writes. Reads are
 downcase-mapped against the *first* case seen for each key, so a Symbol
 key can never be found by a String lookup (Symbol has no meaningful
-downcase mapping in `downcase_keys`). Verified by
-`tmp/rewrite_D/probe_24_cihash_writes.rb`:
+downcase mapping in `downcase_keys`).
 
 ```text
 ci = CaseInsensitiveHash.setup({"Key" => 1})
@@ -117,7 +112,18 @@ ci[:third]      => 7
 ```
 
 Treat it as a read-side convenience for String-keyed hashes; it is not an
-indifferent-access container.
+indifferent-access container. One more trap: the downcase map is
+memoized on the first *missed* case-insensitive lookup and **never
+invalidated by later writes** — if you look up a missing key before
+storing it, the stored key stays invisible to case-insensitive reads:
+
+```text
+ci["fourth"]   # => nil     (builds @downcase_keys WITHOUT "Fourth")
+ci["Fourth"] = 9
+ci["fourth"]   # => nil     (stale map; only ci["Fourth"] works)
+```
+
+Build the hash completely (or call `ci.instance_variable_set(:@downcase_keys, nil)` to reset) before relying on case-insensitive reads.
 
 ## NamedArray
 
@@ -143,9 +149,34 @@ So `count`/`first`/`last`/`zip` are Array's, and any field that happens to
 be named like an Array method is unreachable through the accessor. The
 `key` is exposed via `all_fields` (`[key, fields].compact.flatten`).
 
+### Name resolution is exact-first, then fuzzy — and fuzzy can bite
+
+`identify_name` (`lib/scout/named_array.rb:22`) resolves a String
+selector in this order: **exact match** on `to_s` equality → numeric
+string as a position → **fuzzy match** via `field_match`
+(`lib/scout/named_array.rb:10`) → `nil`. The fuzzy step accepts:
+
+- a field containing `(selector)` — `'Human'` finds `Organism(Human)`
+- a field that is `selector + ' ' + …` or the reverse — `'Sample'`
+  finds `'Sample other'`
+
+Matching is **case-sensitive** (`'alpha'` does not find `'Alpha'`), and
+a miss is silent:
+
+```ruby
+row["nope"]        # => nil      (no error)
+row["nope"] = 3    # no-op       (returns 3, stores nothing)
+row.positions("nope")  # => nil
+row.values_at("nope")  # raises TypeError (nil position reaches Array#values_at)
+```
+
+The practical risk: a slightly wrong column name can silently resolve
+to a *different* column via the fuzzy prefix rule, so prefer exact
+names — or `row.positions(name)` first when unsure.
+
 ## Misc.format family
 
-All from `lib/scout/misc/format.rb`, verified by probe_06/probe_15:
+All from `lib/scout/misc/format.rb`:
 
 | call | result |
 |---|---|
@@ -164,8 +195,7 @@ leading `-` for negatives. The parser is `str.scan(/(\d+)(\w*)/)` and `\w*`
 is greedy, so **each number may be followed by only one unit token**.
 `"1h30m"` is scanned as the single pair `["1", "h30m"]`; `"h30m"` is not in
 the token table, so the product becomes `1 * nil` and raises
-`TypeError: nil can't be coerced into Integer`. Verified by probe_06 and
-`tmp/rewrite_D/probe_16_timespan_exact.rb`:
+`TypeError: nil can't be coerced into Integer`.
 
 ```text
 Misc.timespan('1h')    => 3600
@@ -176,6 +206,7 @@ Misc.timespan('1y')    => 31536000
 Misc.timespan('1:30')  => 90    (HH:MM clock form)
 Misc.timespan('-1h')   => -3600
 Misc.timespan('1h30m') => TypeError: nil can't be coerced into Integer
+Misc.timespan('1h 30m') => 5400  (a space separates the pairs — works)
 Misc.timespan('1x')    => TypeError: nil can't be coerced into Integer
 Misc.timespan('2')     => 2   (bare number uses the default unit, seconds)
 ```
@@ -189,8 +220,7 @@ add the seconds yourself.
 `"9dd4e461268c8034f5c8564e155c67a6"`). `Misc.file_md5(path)` hashes the
 file **contents**; when the digest falls back to a plain `Misc.digest` on a
 path string, it hashes the **path string**, not the content — a missing
-`/nope/x` still yields a digest (`14470bb0...`) instead of raising
-(probe_06). Check `File.exist?` yourself if that distinction matters.
+`/nope/x` still yields a digest (`14470bb0...`) instead of raising. Check `File.exist?` yourself if that distinction matters.
 
 ## `Misc.insist`
 
@@ -203,7 +233,7 @@ See [ErrorHandling.md](ErrorHandling.md) for the retry protocol with
 auto-required** (verify with `defined?(Hook)` => nil after
 `require 'scout-essentials'`; it becomes a constant only after
 `require 'scout/misc/hook'`). It exposes `Hook.extended`, `Hook.apply` and
-`hook_method` (probe_06). `Hook.apply(hook_class, base_class)` redefines the
+`hook_method`. `Hook.apply(hook_class, base_class)` redefines the
 methods the two classes share on `base_class`, aliasing the originals as
 `orig_<name>` and dispatching first to the registered hooks, honouring an
 optional `claim(*args)` predicate on each hook. It is the mechanism behind
@@ -214,7 +244,7 @@ tool registration in `CMD::TOOLS`-style setups.
 Root: `TmpFile.tmpdir` => `$HOME/tmp/scout/tmpfiles` (here
 `/home/mvazque2/tmp/scout/tmpfiles` — a machine-specific example value),
 overridable with `TmpFile.tmpdir=`;
-`TmpFile.user_tmp('sub')` => `$HOME/tmp/scout/sub` (probe_05/probe_15).
+`TmpFile.user_tmp('sub')` => `$HOME/tmp/scout/sub`.
 
 ### Naming conventions (`tmp_for_file`, `lib/scout/tmpfile.rb:98-118`)
 
@@ -227,7 +257,7 @@ overridable with `TmpFile.tmpdir=`;
 | `:md5` tail | digest of the remaining options |
 | `MAX_FILE_LENGTH = 150` | names longer than this are truncated |
 
-Verified shapes (probe_05, re-run as probe_13 for gate 2; `...` is
+Supported shapes (`...` is
 `TmpFile.tmpdir`, here `~/tmp/scout/tmpfiles`):
 
 ```text
@@ -245,14 +275,14 @@ the name and, because `other_options` is then non-empty, still gets the
 **`nil` is not `#{}`**: `tmp_for_file('/a/b/c', nil, ...)` raises
 `NoMethodError: super: no superclass method 'include?' for nil` from
 `process_options` — pass an explicit empty Hash as the second argument when
-you use `other_options` (probe_13).
+you use `other_options`.
 
 ### `with_file` leaks on raise
 
 `TmpFile.with_file(content, erase, options)` writes the temp file, yields
 it, then `Open.rm_rf tmpfile if Open.exist?(tmpfile) && erase` — there is
 **no `ensure`**. If the block raises, the temp file stays on disk
-(probe_05: file still present after `raise "boom"`; removed normally when
+(file still present after `raise "boom"`; removed normally when
 the block succeeds). Add your own `begin/ensure` around `with_file` when the
 block can fail. See [ErrorHandling.md](ErrorHandling.md).
 

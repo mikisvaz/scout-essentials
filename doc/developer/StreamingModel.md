@@ -31,14 +31,14 @@ def self.setup(stream, options = {}, &block)   # concurrent_stream.rb:12
 
 - `threads ||= []`, `pids ||= []`, and new values are **concatenated** onto the
   existing arrays — a second `setup` adds producers, it does not replace them
-  (probe `tmp/rewrite_B/probe_22_cs_semantics.rb`: `idempotent setup: cs? true
+  (`idempotent setup: cs? true
   threads=1 pids=[4]`, `after 2nd threads arg: 2`).
 - `std_err` is **reset to `""`** on every setup.
 - `autojoin`, `no_fail`, `next`, `pair`, `filename`, `lock` are only assigned
   when the corresponding option is non-nil, so an existing value survives.
 - **The block becomes a callback**: a block passed to `setup` is treated as
   `callback` and *composed* with any existing callback, so the new block runs
-  after the old one (`probe_22`: `setup-block callbacks order: [:block, :block2]`).
+  after the old one (observed `[:block, :block2]`).
 
 This is why `Open.open_pipe` (thread mode) can call `setup` on both ends and
 still compose a user callback, and why `add_callback` composes the same way.
@@ -61,8 +61,8 @@ stream.add_callback { cleanup_a }
 stream.add_callback { cleanup_b }   # join runs a, then b
 ```
 
-Verified in `probe_19_streaming_apis.rb` (`add_callback order: [:first,
-:second]`) and `probe_22_cs_semantics.rb`. There is no `add_abort_callback`;
+(`add_callback order: [:first,
+:second]`). There is no `add_abort_callback`;
 `abort_callback = proc { |exception| ... }` replaces the slot (only `setup`
 with an `:abort_callback` option composes it).
 
@@ -121,17 +121,17 @@ def abort(exception = nil)   # concurrent_stream.rb:204
 
 1. records `stream_exception ||= exception`,
 2. marks the object with `AbortedStream.setup(self, exception)` and sets
-   `@aborted = true`; a second call only logs (`Already aborted stream`) and
-   returns — **idempotent** (probe `probe_22_cs_semantics.rb`:
-   `abort idempotent: aborted? true`, `second abort: no raise, aborted? true`),
+  `@aborted = true`; a second call only logs (`Already aborted stream`) and
+  returns — **idempotent**:
+  `abort idempotent: aborted? true`, `second abort: no raise, aborted? true`),
 3. runs `abort_callback` with the exception,
 4. `abort_threads`: raises `Aborted` (or the given exception) in each producer
-   thread and joins them — this is what unblocks a producer stuck writing to a
-   pipe nobody reads,
+  thread and joins them — this is what unblocks a producer stuck writing to a
+  pipe nobody reads,
 5. `abort_pids`: sends `SIGINT` to each pid,
 6. clears both callbacks,
 7. **propagates to `@pair`** if it responds to `abort` and is not already
-   aborted — killing one end of an `Open.open_pipe` pair takes down the other,
+  aborted — killing one end of an `Open.open_pipe` pair takes down the other,
 8. closes and unlocks in `ensure`.
 
 Producers are expected to `rescue Aborted` and finish quietly; `Open.grep`,
@@ -151,7 +151,7 @@ This is how one failing producer takes the whole stream down: the exception is
 stored in `stream_exception` (so a later `join`/`read` re-raises it even if the
 current frame recovers), it is raised in every producer thread, and the stream
 is aborted. `join_threads` and `join_pids` call it, and `ConcurrentStreamProcessFailed`
-carries the offending `pid` plus the stream. Verified: `probe_22_cs_semantics.rb`
+carries the offending `pid` plus the stream.
 (`stream_raise_exception raised: demo`, `stream_exception set: #<Aborted: demo>`,
 `no_fail join of failed: no raise`).
 
@@ -166,7 +166,7 @@ The standard producer wrapper (concurrent_stream.rb:286): it sets the stream up
 with `kwargs`, runs the block, and in an `ensure` closes and joins the stream as
 requested. `Aborted` and any other exception are logged, the stream is aborted
 with the exception, and the exception is re-raised. `Open.open_pipe` (thread
-mode) and `Open.sort_stream` are built on it. Verified: `probe_22_cs_semantics.rb`
+mode) and `Open.sort_stream` are built on it.
 (`process_stream: "z\ny\nx\n" src joined=true src closed=true`).
 
 ## `AbortedStream` and recovering the original cause
@@ -185,8 +185,7 @@ exception = (AbortedStream === content and content.exception) ? content.exceptio
 That exact snippet is what `Open.sensible_write` uses: when copying a stream
 into its tmp file raises, it recovers the original upstream exception from the
 marker and re-raises *that* (deleting the target and tmp file), while a plain
-`Aborted` is swallowed and cleaned up. Verified by P25/P33 and the
-`probe_22`/`probe_13` sequences in `research/behavior-probes.md`.
+`Aborted` is swallowed and cleaned up.
 
 ## `pair` means pipe ends, not stdout/stderr
 

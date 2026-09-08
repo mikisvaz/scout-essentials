@@ -48,11 +48,19 @@ Open.read('file.gz.bak')# raw gzip bytes — NOT detected
 Open.gzip?('file.tgz')  # => false
 ```
 
-Force decompression explicitly when the name does not cooperate:
+To decompress content that does not carry a recognised name, run
+`Open.gunzip` yourself — it is `zcat` behind a `CMD.cmd` pipe:
 
 ```ruby
-Open.open('file.tgz', :gzip => true).read
+Open.read('file.tgz', :gzip => false, :noz => true)  # raw bytes, if that is what you want
+stream = Open.open('file.tgz', :noz => true)         # raw gzip bytes as a stream
+Open.read(Open.gunzip(stream))                       # decompressed
 ```
+
+Note that the historical `:gzip => true` option is **broken as a
+decompression force**: it is forwarded to `CMD.cmd('zcat', …)` as a
+command-line flag, the command fails, and — because `:no_fail` is set —
+you get an empty string instead of an error.
 
 ## Grepping lines
 

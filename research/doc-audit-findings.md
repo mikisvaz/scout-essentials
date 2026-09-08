@@ -3,11 +3,13 @@
 Audit target: `/bulk/mvazque2/git/scout-essentials` (gem v1.8.8, HEAD `a0324a4`).
 Outcome: `doc/` fully rewritten (17 pages) + 5 new pages + `README.md` rewritten;
 Critic final gate: **ACCEPT_WITH_NOTES** (notes applied).
-This file is the retained summary. The full evidence trail (coverage matrix with
-261 rows, 22 per-claim ledgers, 3 implementation inventories, 66 behavior probes,
-ecosystem attribution, phase reports and critic gates) lives in
-`research/doc_audit/`, `research/` and `tmp/critic/` — see
-`research/doc_audit/resumption-reference.md` §2 for the index.
+This file is the retained summary. Of the full evidence trail, the
+durable parts still in the repository are
+`research/behavior-probes.md` (66 behavior probes, executed
+transcripts) and the three `research/implementation-inventory-*.md`
+file:line inventories; the transient working directories
+(`research/doc_audit/`, `tmp/critic/`) were removed after the audit
+closed.
 
 Disposition counts (coverage-matrix sections A–F, 238 rows): OK 3 · FIX 117 ·
 EXPAND 67 · NEW_PAGE 27 · INTERNAL 6 · ELSEWHERE 13 · OUT_OF_SCOPE 6.

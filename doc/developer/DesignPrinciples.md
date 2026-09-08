@@ -3,8 +3,6 @@
 The handful of conventions that hold across `lib/scout`. Everything below is
 observable in the source of this repo; nothing here is aspirational.
 
-Everything below is backed by `tmp/rewrite_C/probe_11_design.rb`
-(probe_11), which reproduces each claim from a clean `require`.
 
 ## Composition by annotation
 
@@ -32,7 +30,7 @@ The public namespaces (`Path`, `Open`, `CMD`, `Persist`, `Misc`, `Log`,
 `Resource`, `SOPT`, `IndiferentHash`, `TmpFile`, `Annotation`) are modules
 whose methods are module-functions or class methods. Subclassing one of them
 is not an option — `Persist` is a `Module`, so `class X < Persist` raises
-`TypeError: superclass must be an instance of Class` (probe_11). The reuse
+`TypeError: superclass must be an instance of Class`. The reuse
 pattern is `extend` (`resource/path.rb`, `annotation/annotated_object.rb`).
 
 ## Options hashes over positional flags
@@ -72,7 +70,7 @@ class KeepBar      < Exception; end   # log/progress/util.rb: keep the bar
 bare `rescue` *does* catch.)
 
 The point is deliberate: a bare `rescue => e` (which rescues
-`StandardError`) **does not intercept them** — probe_11 raises each in turn
+`StandardError`) **does not intercept them**
 inside `begin ... rescue => e` and shows the signal escapes the bare
 `rescue`. A producer that wants the caller to keep the stream it was handed
 raises `DontClose` (carrying the result in `.payload`), and `Open.open`'s
@@ -90,8 +88,8 @@ Practical rules:
 - aborting a `CMD` pipe surfaces as `Aborted` (a `StandardError`) or as the
   `AbortedStream` **module** that is `extend`ed onto the stream object —
   these are what streaming consumers should rescue
-  ([Streaming Model](StreamingModel.md); probe_11 shows
-  `AbortedStream` is a Module, not a Class).
+  (see [Streaming Model](StreamingModel.md); `AbortedStream` is a
+  Module, not a Class).
 
 ## Atomic writes
 
@@ -116,9 +114,9 @@ Anything that produces a file other users may read concurrently goes through
 
 Cleanup is explicit, not automatic. `TmpFile.with_file` removes the temporary
 file only when the block ends normally — there is no `ensure` around the
-`yield`, so an exception leaves the file behind (probe_11; verified against
-`lib/scout/tmpfile.rb:71-73`). Likewise stream closing depends on the signal classes
-above, and progress bars rely on `Log::ProgressBar.remove_bar` being called.
+`yield`, so an exception leaves the file behind. Likewise stream closing
+depends on the signal classes above, and progress bars rely on
+`Log::ProgressBar.remove_bar` being called.
 When correctness matters, put the cleanup in an `ensure` or use
 `Open.consume_stream`.
 

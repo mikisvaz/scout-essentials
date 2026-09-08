@@ -5,9 +5,8 @@ Fetching remote files over HTTP(S)/FTP/SSH, the URL cache that backs
 Source: `lib/scout/open/remote.rb`, `lib/scout/open/sync.rb`,
 `lib/scout/resource/sync.rb`.
 
-Executed examples come from `tmp/rewrite_D/probe_07_remote.rb`, which
-starts a throwaway local `python3 -m http.server` to serve real URLs;
-transcripts live in `tmp/rewrite_D/BATCH_D_PROBE_TRANSCRIPTS.txt`.
+Executed examples run against a throwaway local `python3 -m http.server`
+serving real URLs.
 
 For the local side of `Open` see [WorkingWithFiles.md](WorkingWithFiles.md);
 for `Resource` itself see [ProducingResources.md](ProducingResources.md).
@@ -25,8 +24,7 @@ Open.ssh?('http://a')      # => false
 ```
 
 Both are pure regexes (`/^(?:https?|ftp|ssh):\/\//` and `/^ssh:\/\//`). A
-path without a scheme is never remote. Verified by
-`tmp/rewrite_D/probe_07_remote.rb`.
+path without a scheme is never remote.
 
 ## `Open.ssh` — reading over SSH
 
@@ -46,20 +44,19 @@ behaviour is to serve from that cache without touching the network.
 
 ```ruby
 Open.remote_cache_dir            # $HOME/.scout/var/cache/open-remote
-Open.remote_cache_dir = dir      # override (probe sets it to a tmpdir)
+Open.remote_cache_dir = dir      # override (e.g. a tmpdir)
 Open.cache_file(url, options)    # <cache_dir>/<digest>
 ```
 
 The digest (`Open.digest_url`) covers the URL, the `--post-data` value and
 the **sorted lines** of `--post-file`. Different post-data therefore gets a
-different cache entry (probe: three URLs/options => three distinct cache
-paths).
+different cache entry (three URLs/options => three distinct cache paths).
 
 ### No TTL, no expiry
 
 There is no timestamp check and no maximum age. Once a URL is cached, a
 later `Open.wget` of the same URL/options returns the cached bytes even if
-the server has changed. The probe demonstrates it: the file was edited on
+the server has changed: the file can be edited on
 the server three times (`HELLO` → `FIRST` → `SECOND` → `THIRD`) while the
 second `Open.wget` still reported the old cached content.
 
@@ -72,7 +69,7 @@ Open.remove_from_cache(url, options)  # delete the cache entry
 ```
 
 **Exactly `'update'`** re-fetches and re-writes the cache, then *reads it
-back* (probe: after `Open.wget(url, :nocache => 'update')` the returned file
+back*: after `Open.wget(url, :nocache => 'update')` the returned file
 is the cache file again, not the raw pipe). Any other truthy `nocache`
 value takes the other branch and returns the raw wget pipe **without**
 touching the cache. `:force` only bypasses the initial `in_cache?` lookup,
@@ -90,7 +87,7 @@ wrapped in `OpenURLError` with the message
 
 `Open.download(url, file)` runs `wget '<url>' -O '<file>'` via
 `CMD.cmd_log`; on failure it removes the partial output file and re-raises
-the original error. Verified: downloading a live URL produced the current
+the original error: downloading a live URL writes the current
 server bytes (no cache involved).
 
 `Open.scp(source_file, target_file, target:, source:)` first creates the
@@ -123,7 +120,7 @@ directory itself. A local-to-local sync of the identical path logs a warning
 and returns.
 
 `Open.sync(...)` is a literal alias: `Open.sync` and `Open.rsync` are the
-same implementation forwarded with Ruby's `...` (probe: same owner). Use
+same implementation forwarded with Ruby's `...` (same owner). Use
 either name — they are interchangeable.
 
 ## `Resource.sync(path, map, options)`
@@ -143,7 +140,7 @@ Open.wait(lag, key = nil)
 
 A tiny rate limiter backed by the module-level `LAST_TIME` hash. If the
 last call *for that key* was less than `lag` seconds ago, it sleeps the
-remainder. `Open.wget` uses it via `:nice` / `:nice_key`. Probe: two
+remainder. `Open.wget` uses it via `:nice` / `:nice_key`. Two
 `Open.wait(0.3, :k)` calls in a row took 0.3 s wall clock.
 
 Note the process-local `LAST_TIME` map is shared mutable state with no

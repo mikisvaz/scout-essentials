@@ -24,8 +24,6 @@ token on `::` and returns `[token, priority]`:
 | `key:` / `key:<name>` | 20 | the key itself; LOWEST priority |
 | `token::N` | N | explicit numeric suffix always wins over the defaults |
 
-Verified by `tmp/rewrite_D/probe_11_token_probe.rb`:
-
 ```text
 workflow:x   => ["workflow:x", 4]
 task:x       => ["task:x", 3]
@@ -44,8 +42,8 @@ plain value.
 ## A worked example
 
 A common misreading is "workflow overrides task". The numbers say the
-opposite — `line` (1) outranks `workflow` (4). `tmp/rewrite_D/probe_13_get_internals.rb`
-stacks all four tokens on one key and shows the chain end-to-end:
+opposite — `line` (1) outranks `workflow` (4). Stacking all four tokens on
+one key shows the chain end-to-end:
 
 ```ruby
 def fresh(k); Scout::Config::CACHE.delete(k); end
@@ -73,11 +71,11 @@ Scout::Config.get(k,'workflow:W','task:T')
 ```
 
 Within one priority bucket the LAST `set` wins (`priorities[prio].unshift`,
-`lib/scout/config.rb:83`; verified `probe_13` `two task entries => "second"`).
+`lib/scout/config.rb:83`; two entries set with `task:` leave the *second*
+as the winner).
 
 Explicit suffixes punch through the table, both ways — `::1` promotes an
-entry above every default token, `::30` buries it below `key:` (probe_13,
-cases `q6`/`q7`). Note the suffix is per-entry, not per-key: it re-prices one
+entry above every default token, `::30` buries it below `key:` (cases `q6`/`q7`). Note the suffix is per-entry, not per-key: it re-prices one
 `set` call, it does not change the token for later calls.
 
 ### Implicit caller tokens
@@ -85,8 +83,7 @@ cases `q6`/`q7`). Note the suffix is per-entry, not per-key: it re-prices one
 Every `Config.get` appends `file:<caller>` and `line:<caller>:<n>` derived
 from `caller` (`lib/scout/config.rb:119-127`), after filtering out frames
 matching the legacy rbbt regexes (see *Legacy internals* below). Entries set
-with those tokens match without being named in the call (verified
-`probe_12`, `matched by implicit caller file token => "v"`).
+with those tokens match without being named in the call.
 
 ## `etc/config` files
 
@@ -103,9 +100,7 @@ key value token
 (`lib/scout/config.rb:27-31`). `find_all` returns paths in `map_order`
 (`current, user, home, local, global, usr, lib, fast, cache, bulk, ...`), so
 the **reverse** order loads the *most specific* file (e.g. `$PWD/etc/config`)
-**first** and `$HOME/.scout/etc/config` last. Two files setting the same key
-with the same (implicit `key:`) token were tested by
-`tmp/rewrite_D/probe_23_findall_order.rb`:
+**first** and `$HOME/.scout/etc/config` last.
 
 ```text
 map_order    => [:current, :user, :home, ...]
@@ -130,33 +125,30 @@ one key it auto-adds the `key:<name>` token (`add_entry`,
 `Config.get(key, *tokens)` (`lib/scout/config.rb:94-155`) does four things
 after resolving the winner:
 
-1. **`'false'` becomes `false`** — the ONLY string-to-object coercion.
-   Verified in `tmp/rewrite_D/probe_10_env.rb`: `'false'` → `false`
-   (FalseClass), but `'TRUE'`, `'0'` and `'42'` all stay Strings.
-2. **`'nil'` becomes `nil`** (probe_10).
+1. **`'false'` becomes `false`** — the ONLY string-to-object coercion
+   (`'TRUE'`, `'0'` and `'42'` all stay Strings).
+2. **`'nil'` becomes `nil`**.
 3. **`env:VAR[,VAR2]`** in the resolved value is replaced by the first set
-   environment variable, and `get` returns `nil` if none is set (probe_10,
-   `'from-env'`).
+   environment variable, and `get` returns `nil` if none is set.
 4. Every `get` appends `[key, value, tokens]` to `GOT_KEYS` — an audit trail
-   of what was asked and answered (probe_10). `with_config` snapshots and
-   restores it.
+   of what was asked and answered. `with_config` snapshots and restores it.
 
 Options hash as last argument:
 
 - `:default => v` — used when no entry matches.
-- `:env => 'VAR1,VAR2'` — first set env var becomes the default (probe_10).
+- `:env => 'VAR1,VAR2'` — first set env var becomes the default.
 
 A `Symbol` key raises `TypeError` — the cache is keyed by `key.to_s`, but
 `CACHE[key.to_s]` is called after `match` has already used the raw key;
 `Config.get(:symbol)` raises `TypeError: no implicit conversion of Symbol
-into String` (probe_10). Use String keys.
+into String`. Use String keys.
 
 ## `with_config` and `process_config`
 
 `with_config { ... }` (`lib/scout/config.rb:157-166`) dups every `CACHE`
 bucket and `GOT_KEYS`, yields, and restores both in an `ensure`. Anything
 `set` inside the block is rolled back — including sets made by code you
-call (probe_10: `inside => "inside"`, `after => "outside"`). It is the
+call (`inside => "inside"`, `after => "outside"`). It is the
 mechanism that keeps config changes from leaking out of a sub-operation.
 
 `Config.process_config(config)` (`lib/scout/config.rb:168-180`) interprets
@@ -165,11 +157,9 @@ a CLI `--config` argument, in this order:
 1. existing file path → `load_file`
 2. name of an existing `Scout.etc.config_profile[config]` file → `load_file`
 3. otherwise a `"key value token..."` string. The `::N` suffix is mandatory
-   in the stored token: any token without one gets `prio = "0"`, i.e. the
-   token is re-emitted as `token::0`.
+  in the stored token: any token without one gets `prio = "0"`, i.e. the
+  token is re-emitted as `token::0`.
 
-Verified by `tmp/rewrite_D/probe_17b.rb` / `probe_17c.rb`. The subtle part
-of case 3 is that the stored token keeps the suffix, so `process_config
 "k3 cli workflow::0"` stores the token `workflow::0`, whose *name* is the
 bare string `workflow` at priority 0 (stronger than `task`=3,
 `file`=2, `line`=1, `key:`=20), and it does **not** match a call like
@@ -190,8 +180,8 @@ carrying an explicit smaller `::N` — but only for lookups that pass the bare
 
 ## Environment variables read by the gem
 
-Verified by grep over `lib/` and, where noted, executed probes
-(`tmp/rewrite_D/probe_10_env.rb` covers the `env:`/`:env` machinery; the
+Established by grep over `lib/`
+(covers the `env:`/`:env` machinery; the
 rest are read directly from source):
 
 | variable | read by | effect |
@@ -221,7 +211,7 @@ frames whose path matches those patterns are skipped when deriving
 ## Thread-safety
 
 There is no mutex anywhere in `lib/scout/config.rb` (`Scout::Config` has no
-`Mutex` ivar; verified `tmp/rewrite_D/probe_09_threads_fork.rb`). `CACHE`
+`Mutex` ivar; 
 and `GOT_KEYS` are plain shared structures and `add_entry` does
 read-modify-write (`CACHE[key] ||= []; CACHE[key] << ...`). Concurrent
 `set`/`get` from threads is therefore unprotected; the gem's own processes

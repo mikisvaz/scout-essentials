@@ -18,7 +18,7 @@ end
 
 `Open.init_lock` (called when the file is loaded) overrides the library
 defaults, so the effective settings here are **not** the upstream ones
-(probe_08):
+:
 
 | setting | library default | effective here |
 |---|---|---|
@@ -34,7 +34,7 @@ attempts sleeps 4 s.
 ## What a lock looks like on disk
 
 Acquiring `<file>` creates `<file>.lock` and a hidden sibling. The payload
-written into the lock is four lines (probe_08):
+written into the lock is four lines :
 
 ```text
 /tmp/…/data.txt.lock contents:
@@ -75,7 +75,7 @@ raised over the block's own result.
 ## The three lock namespaces
 
 Each subsystem locks in its own directory so the names never collide
-(probe_02/probe_03):
+:
 
 | who | directory | name shape |
 |---|---|---|
@@ -83,19 +83,19 @@ Each subsystem locks in its own directory so the names never collide
 | `Resource#lock_dir` | `$HOME/.scout/tmp/produce_locks` | `TmpFile` digest of the resource path |
 | `Open.sensible_write` | `$HOME/.scout/tmp/sensible_write_locks` | digest of the output path |
 
-Verified strings:
+The three directories, with an example of each lock file name:
 
 ```text
 Persist.lock_dir                => $HOME/.scout/tmp/persist_locks
-persist lock file               => .../persist_locks/probeD3.persist
+persist lock file               => .../persist_locks/<key>.persist
 Resource#lock_dir               => $HOME/.scout/tmp/produce_locks
-produce lock file               => .../produce_locks/·home·mvazque2·.scout·etc·probeD2
+produce lock file               => .../produce_locks/<flattened·produce·path>
 sensible_write lock dir         => $HOME/.scout/tmp/sensible_write_locks
 ```
 
-(The `·home·mvazque2·...` name is literal `TmpFile.tmp_for_file` output —
-each `/` in the probe path was flattened to `·` — and is kept verbatim; the
-home-directory component is a machine-specific example value.)
+(The `·flattened·` component is `TmpFile.tmp_for_file` output: each `/`
+in the produce path is flattened to `·` so the lock file name stays a
+single path component.)
 
 (See [PersistenceAndResources.md](PersistenceAndResources.md) for how
 `persist` uses its lock, and [StreamingModel.md](StreamingModel.md) for
@@ -106,10 +106,10 @@ home-directory component is a machine-specific example value.)
 `Persist.persist(..., :persist_type/:type)` can return a stream that must
 stay locked while the consumer reads it. Raising `KeepLocked.new(res)` from
 inside the persist block leaves the lock held; the caller gets the stream
-back. probe_03:
+back:
 
 ```ruby
-res = Persist.persist("probeD3", :text, :persist => false) do
+res = Persist.persist("my-key", :text, :persist => false) do
   raise KeepLocked.new("payload")
 end
 res                       # => "payload"
@@ -131,8 +131,6 @@ File.exist?(lock_path)    # => true   (lock still held)
 - **Cross-process.** That is what the locks above are for.
 
 ## Thread-safety caveats
-
-Verified by `tmp/rewrite_D/probe_09_threads_fork.rb`:
 
 - `Log::LAST` is a shared top-level `String` — a write from one thread is
   visible to the next with no synchronisation.

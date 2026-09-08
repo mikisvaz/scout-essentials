@@ -11,6 +11,9 @@ scout-essentials=/$PWD filter="*.rb *.txt *.md *.conf *.yaml" {
   cmd
 
   timeout
+
+  cortex_coder
+  cortex_coder.analyze
  }
  doc=doc{
   Improvements.md

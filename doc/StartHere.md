@@ -40,7 +40,7 @@ Log.info "wrote 2 lines"
 Transitive pulls: `scout/open` (hence `Open`, `CMD`, `NamedStream`),
 `scout/annotation` (hence `Annotation`), `scout/misc` (via
 `scout/tmpfile`/`scout/open`). Notably **not** loaded by the umbrella
-require (verified by probe `tmp/rewrite_C/probe_01_requires.rb`):
+require (against the current `lib/`):
 
 - `NamedArray` — `require 'scout/named_array'`
 - `Hook` (a **top-level** `module Hook`, *not* `Misc::Hook`) —
@@ -117,6 +117,7 @@ ruby -Ilib -Itest test/scout/test_misc.rb
 - [Core Utilities](developer/CoreUtilities.md)
 
 **Research artifacts** (`../research/`) are non-normative supporting
-material: `research/doc_audit/*` holds the per-claim audit ledgers,
-`research/behavior-probes.md` the probe transcripts, and
-`research/implementation-inventory-*.md` the file:line inventories.
+material: design and behaviour analyses written while this
+documentation was produced. The behaviour they describe is captured in
+`doc/` and in the `test/` suite, which now carry the same facts in
+executable form.

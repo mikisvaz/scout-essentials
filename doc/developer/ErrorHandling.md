@@ -9,8 +9,6 @@ file), `lib/scout/cmd.rb:22-31` (`CMD::Timeout`),
 
 ## The taxonomy
 
-Verified by `tmp/rewrite_D/probe_14_exceptions_full.rb`:
-
 ```text
 ScoutDeprecated                  parent=StandardError
 ScoutException                   parent=StandardError
@@ -42,8 +40,7 @@ not in the raise/catch taxonomy at all.
 
 Failures derive from `StandardError` and behave normally. Control-flow
 signals derive straight from `Exception`, so a bare `rescue =>` (which
-means `rescue StandardError`) will **not** see them — verified
-`probe_14`:
+means `rescue StandardError`) will **not** see them:
 
 ```ruby
 raise DontClose.new("payload")
@@ -51,7 +48,8 @@ raise DontClose.new("payload")
 # rescue Exception -> catches
 ```
 
-Probe results:
+The rescue behaviour follows directly from the superclass — each of
+them extends `Exception`, not `StandardError`:
 
 ```text
 DontClose  caught by 'rescue =>' => NOT caught; needs 'rescue Exception'
@@ -90,7 +88,7 @@ raised from `ConcurrentStream#join_threads` when a thread's value is a
 `Process::Status` that did not succeed (unless `no_fail`).
 
 `CMD::Timeout < ProcessFailed` (`lib/scout/cmd.rb:22-31`) adds `command`
-and `timeout` readers and composes the message through `super` — verified:
+and `timeout` readers and composes the message through `super`:
 
 ```text
 CMD::Timeout message => "Process 12 failed - command 'sleep 3 ' exceeded timeout of 0.1 seconds"
@@ -118,9 +116,8 @@ exception = (AbortedStream === content and content.exception) ? content.exceptio
 ```
 
 So the caller of `sensible_write` sees the root cause that made the
-producer abort, rather than a secondary wrapper. Verified by
-`research/behavior-probes.md` P25/P33 and `tmp/rewrite_B/probe_12_swallow.rb`
-(`exists after Aborted => false`).
+producer abort, rather than a secondary wrapper (`exists after Aborted
+=> false`).
 
 The `ensure` always removes the temp file and unlocks a held
 `Lockfile` (`lib/scout/open/stream.rb:165-171`).
@@ -129,8 +126,6 @@ The `ensure` always removes the temp file and unlocks a held
 
 `Misc.insist` (`lib/scout/misc/insist.rb`) retries the block while the
 code inside raises `TryAgain`; `StopInsist` and `Aborted` break out.
-Verified `tmp/rewrite_B/probe_01` / `probe_10_misc.rb` and
-`tmp/rewrite_D/probe_04_exceptions.rb`:
 
 ```ruby
 tries = 0
@@ -161,13 +156,11 @@ end
 
 - `Persist.persist(..., :canfail => true)` — exceptions from the block are
   caught; the persist file is removed and `nil` is returned
-  (`lib/scout/persist.rb:63-100`; verified `tmp/rewrite_D/probe_03_locks.rb`:
-  `persist canfail => nil`, `file removed: true`).
+  (`lib/scout/persist.rb:63-100`; `persist canfail => nil`, `file removed: true`).
 - `ConcurrentStream` `no_fail: true` — a non-success
   `Process::Status` from a joined thread is logged at low level instead of
   raising `ConcurrentStreamProcessFailed`
-  (`lib/scout/concurrent_stream.rb:113`; also `research/behavior-probes.md`
-  P26).
+  (`lib/scout/concurrent_stream.rb:113`).
 - `CMD`'s `no_fail` similarly suppresses both `ProcessFailed` from a thread
   join and exceptions during join.
 
@@ -181,11 +174,9 @@ happily write empty output unless the producer itself is aborted.
 `ensure` that removes both. But cleanup is not uniform across the gem:
 
 - **`TmpFile.with_file` leaks the temp file when the block raises** — there
-  is no `ensure` around the `yield`
-  (`lib/scout/tmpfile.rb:34-48`; verified
-  `tmp/rewrite_D/probe_05_tmpfile_leak.rb`: the created tmp file is still
-  present after the block raises `RuntimeError`). Wrap your own `begin/ensure`
-  around `with_file` if the block can fail.
+  is no `ensure` around the `yield` (`lib/scout/tmpfile.rb:34-48`); the
+  created tmp file is still present after the block raises `RuntimeError`.
+  Wrap your own `begin/ensure` around `with_file` if the block can fail.
 - `Open.sensible_write` deletes the *target* on failure but only the
   *temp* file, never other files written by a streaming producer.
 - `Misc.insist` retries without undoing side effects already produced by
