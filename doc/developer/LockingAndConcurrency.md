@@ -53,6 +53,15 @@ temporary file in the same directory and then **hard-linked** to
 recognise locks left behind by dead processes and remove them. Once the
 original temp name is unlinked, `nlink` on the surviving `.lock` is 1.
 
+The liveness test behind both `sweep` and the stale-age stealing is
+`Process.kill(0, pid)` (`alive?`, `lib/scout/open/lock/lockfile.rb:379`),
+which resolves pids in the **caller's PID namespace**. In a bubblewrap or
+container namespace a host pid is simply absent ⇒ reported dead while its
+process is alive ⇒ the lock can be swept or stolen from a live holder.
+Never share a lock directory across PID namespaces: pin `HOME` (and the
+`tmp` path map) per sandbox. See
+[lock-namespace-blindness](../../research/lock-namespace-blindness.md).
+
 ## `Open.lock` and `LockInterrupted`
 
 ```ruby
