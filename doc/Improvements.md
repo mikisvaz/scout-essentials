@@ -224,3 +224,21 @@ to a temporary cache dir or raising a clearer error message.
 | Bugs (🔴) | 0 |
 | Improvements (🟡) | 15 |
 | Done (🟢) | 1 |
+
+---
+
+## Promotion ledger
+
+- **2026-09-12** — `research/doc-practices-guide.md` (491 lines, Critic-
+  reviewed 93/100) promoted to
+  `doc/developer/DocumentationPractices.md`. Evidence labels (`[V]` /
+  `[R1]` / `[R2]` / `[REPT]`) and all Critic-mandated caveats preserved
+  verbatim in the page. Provenance retained in the Cortex artifacts
+  `doc-guide/*` and `search/doc-guide-source-map.md`, and in the three
+  sessions `~/chats/scout-essentials/cortex_coder`,
+  `~/chats/scout-gear/cortex_coder`, `~/chats/scout-ai/cortex_coder`.
+  The source file's retirement is planned in a follow-up commit after
+  independent verification. Gemspec file list reconciled (4 additions:
+  `doc/developer/DocumentationPractices.md`,
+  `research/doc-structure.md`, `research/lock-namespace-blindness.md`,
+  `research/probing-guide.md`).

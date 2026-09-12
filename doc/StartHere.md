@@ -115,6 +115,7 @@ ruby -Ilib -Itest test/scout/test_misc.rb
 - [Error Handling](developer/ErrorHandling.md)
 - [Locking and Concurrency](developer/LockingAndConcurrency.md)
 - [Core Utilities](developer/CoreUtilities.md)
+- [Documentation Practices](developer/DocumentationPractices.md)
 
 **Research artifacts** (`../research/`) are non-normative supporting
 material: design and behaviour analyses written while this
