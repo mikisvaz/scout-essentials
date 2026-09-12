@@ -8,8 +8,9 @@ a subsystem study, Critic/verifier agents gating results, and any agent
 resuming an interrupted campaign. Every practice below carries an evidence
 label; thin or single-reviewer evidence is marked as such and never
 presented as verified. The content is promoted from
-`research/doc-practices-guide.md`, which remains the detailed source until
-its planned retirement after this promotion.
+`research/doc-practices-guide.md`, which was retired after Critic-verified
+promotion; its unique associated-elements inventory is preserved in the
+Cortex closure artifact `doc-guide/promotion-record.md`.
 
 ## Notation and evidence grades
 
@@ -432,8 +433,9 @@ of the evidence, never practices to follow.
 ## Provenance
 
 This page is promoted from `research/doc-practices-guide.md` (491 lines),
-which is planned for retirement after this promotion; retirement follows
-the distill-before-delete rule in A4.
+which was retired in a follow-up commit after Critic-verified promotion
+(931f728, PASS 97/100); retirement followed the distill-before-delete
+rule in A4.
 
 The guide was produced by a staged process: (1) a chat manifest fixed
 session identity, path caveats, and the guide host repo; (2) three
@@ -469,5 +471,6 @@ resolve):
 Cross-linked campaign artifacts named by the guide (probe sets, claims
 exemplars, harness findings, the scout-ai subsystem index and
 promotion-state pair) remain in the Cortex workspace; the guide's
-associated-elements inventory is the authoritative list and is not
-duplicated here.
+§17 associated-elements inventory is preserved verbatim in the Cortex
+closure artifact `doc-guide/promotion-record.md` (campaign closure
+record), which is the authoritative inventory.

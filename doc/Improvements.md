@@ -237,8 +237,10 @@ to a temporary cache dir or raising a clearer error message.
   `doc-guide/*` and `search/doc-guide-source-map.md`, and in the three
   sessions `~/chats/scout-essentials/cortex_coder`,
   `~/chats/scout-gear/cortex_coder`, `~/chats/scout-ai/cortex_coder`.
-  The source file's retirement is planned in a follow-up commit after
-  independent verification. Gemspec file list reconciled (4 additions:
+  The source file was retired in a follow-up commit after independent
+  verification (Critic PASS 97/100); its unique §17 associated-elements
+  inventory is preserved in the Cortex closure artifact
+  `doc-guide/promotion-record.md`. Gemspec file list reconciled (4 additions:
   `doc/developer/DocumentationPractices.md`,
   `research/doc-structure.md`, `research/lock-namespace-blindness.md`,
   `research/probing-guide.md`).
