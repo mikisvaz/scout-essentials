@@ -42,7 +42,7 @@ module Path
 
       post_fix = "--#{filename.length}--#{Misc.digest(filename)[0..4]}" + extension
 
-      filename = filename[0..(length - post_fix.length - 1)] << post_fix
+      filename = Annotated.purge(filename.to_s)[0..(length - post_fix.length - 1)] << post_fix
     else
       filename
     end
