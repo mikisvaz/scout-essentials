@@ -79,10 +79,16 @@ module IndiferentHash
     case key
     when Symbol, Module
       v = super(key) 
-      v.nil? ? super(key.to_s) : v
+      vn = super(key.to_s) 
+      v.nil? ? vn : v
     when String
       v = super(key)
-      v.nil? ? super(key.to_sym) : v
+      vn = begin
+             super(key.to_sym) 
+           rescue
+             nil
+           end
+      v.nil? ? vn : v
     else
       super(key)
     end
