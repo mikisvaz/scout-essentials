@@ -1,7 +1,7 @@
 require 'digest/md5'
 module Log
   FP_MAX_STRING = 150
-  FP_MAX_ARRAY = 20
+  FP_MAX_ARRAY = 25
   FP_MAX_HASH = 10
 
   def self.truncate_string(string, max=FP_MAX_STRING)
