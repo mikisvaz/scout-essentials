@@ -28,21 +28,33 @@ scout-essentials=/$PWD filter="*.rb *.txt *.md *.conf *.yaml" {
    HandlingStreams.md
    LoggingAndProgress.md
    ProducingResources.md
+   RemoteData.md
    RunningCommands.md
    WorkingWithFiles.md
   }
   developer=developer{
    AnnotationSystem.md
    Architecture.md
+   Configuration.md
+   CoreUtilities.md
    DesignPrinciples.md
+   DocumentationPractices.md
+   ErrorHandling.md
+   LockingAndConcurrency.md
    PathResolution.md
    PersistenceAndResources.md
    StreamingModel.md
+   Testing.md
   }
  }
  lib=lib {
   scout-essentials.rb
   scout=scout{
+   testing.rb
+   testing=testing{
+    availability.rb
+    scout_state.rb
+   }
    annotation.rb
    annotation=annotation{
     annotated_object.rb
@@ -146,7 +158,7 @@ scout-essentials=/$PWD filter="*.rb *.txt *.md *.conf *.yaml" {
    test_tmpfile.rb
    annotation=annotation{
     test_array.rb
-    }
+   }
    misc=misc{
     test_digest.rb
     test_filesystem.rb
