@@ -1,4 +1,3 @@
-
 require 'simplecov'
 
 module SimpleCov::Configuration
@@ -25,26 +24,41 @@ require 'scout/tmpfile'
 require 'scout/log'
 require 'scout/open'
 require 'scout/persist'
+require 'scout/testing'
+require 'scout/testing/scout_state'
 
 class Test::Unit::TestCase
-
-  def assert_equal_path(path1, path2)
-    assert_equal File.expand_path(path1), File.expand_path(path2)
-  end
+  include Scout::Testing::Assertions
 
   def tmpdir
-    @tmpdir ||= Path.setup('tmp/test_tmpdir').find
+    @tmpdir ||= Path.setup(Scout::Testing.create_tmpdir(
+      parent: File.expand_path('../tmp/test-runs', __dir__),
+      prefix: "#{self.class.name}-"
+    ))
   end
 
   setup do
-    TmpFile.tmpdir = tmpdir.tmpfiles
+    @scout_testing_state = Scout::Testing::State.new(tmpdir).activate
+    @saved_progress_severity = [
+      Log::ProgressBar.instance_variable_defined?(:@default_severity),
+      Log::ProgressBar.instance_variable_get(:@default_severity)
+    ]
     Log::ProgressBar.default_severity = 0
-    Persist.cache_dir = tmpdir.var.cache
-    Persist::MEMORY_CACHE.clear
-    Open.remote_cache_dir = tmpdir.var.cache
   end
-  
+
   teardown do
-    Open.rm_rf tmpdir
+    begin
+      @scout_testing_state.restore if @scout_testing_state
+    ensure
+      if @saved_progress_severity
+        existed, value = @saved_progress_severity
+        if existed
+          Log::ProgressBar.instance_variable_set(:@default_severity, value)
+        elsif Log::ProgressBar.instance_variable_defined?(:@default_severity)
+          Log::ProgressBar.remove_instance_variable(:@default_severity)
+        end
+      end
+      Scout::Testing.remove_tmpdir(@tmpdir) if @tmpdir
+    end
   end
 end

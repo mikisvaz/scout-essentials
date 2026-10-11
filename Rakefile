@@ -21,6 +21,15 @@ Juwelier::Tasks.new do |gem|
   gem.add_runtime_dependency 'yaml'
   gem.add_runtime_dependency 'rake'
   gem.add_runtime_dependency 'listen'
+
+  # Juwelier's default file list comes from Git's tracked files. Include these
+  # current additions explicitly so an uncommitted working-tree build packages them.
+  gem.files += %w[
+    doc/developer/Testing.md
+    lib/scout/testing.rb
+    lib/scout/testing/scout_state.rb
+    test/scout/test_testing.rb
+  ]
 end
 Juwelier::RubygemsDotOrgTasks.new
 require 'rake/testtask'

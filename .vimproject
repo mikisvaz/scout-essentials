@@ -14,6 +14,8 @@ scout-essentials=/$PWD filter="*.rb *.txt *.md *.conf *.yaml" {
 
   cortex_coder
   cortex_coder.analyze
+
+  testing_basics
  }
  doc=doc{
   Improvements.md

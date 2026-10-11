@@ -20,10 +20,10 @@ module Open
     return if Path === io
     return unless io.respond_to? :read
 
-    if io.respond_to? :closed? and io.closed?
-      io.join if io.respond_to? :join
-      return
-    end
+    #if io.respond_to? :closed? and io.closed?
+    #  io.join if io.respond_to? :join
+    #  return
+    #end
 
     if in_thread
       consumer_thread = Thread.new(Thread.current) do |parent|

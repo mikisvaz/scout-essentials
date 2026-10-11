@@ -105,6 +105,7 @@ ruby -Ilib -Itest test/scout/test_misc.rb
 
 **Developer guides** — how the library *works*:
 
+- [Testing](developer/Testing.md) — test layout, generic and Scout-specific support, and isolation conventions
 - [Architecture](developer/Architecture.md)
 - [Design Principles](developer/DesignPrinciples.md)
 - [Annotation System](developer/AnnotationSystem.md)
