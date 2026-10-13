@@ -258,9 +258,45 @@ end
 
 The Scout-state layer isolates and restores selected `TmpFile`, `Persist`, and `Open` settings and the `Persist::MEMORY_CACHE` mapping. It does not reset every global variable, environment setting, singleton, registry, or configuration source.
 
+Callers may opt in to additional simple path settings by passing
+`bindings: [[owner, accessor, relative_path], ...]` to `State.new` or
+`with_isolated_state`. For example:
+
+```ruby
+Scout::Testing.with_isolated_state('tmp/test-state', bindings: [
+  [MyCache, :directory, 'my-cache']
+]) do
+  # MyCache.directory points below tmp/test-state here.
+end
+```
+
+Each binding names a class/module accessor (such as `:directory` with a
+`directory=` setter) and a non-empty relative path. The target directory is
+created below the canonical isolation root; absolute paths, paths escaping
+that root, and existing symlink components within it are rejected. Binding
+state is saved before activation, including whether its conventional
+`@<accessor>` instance variable was unset. Activation and block
+failures trigger restoration. Every activated binding is restored even if a
+setter fails; the implementation also restores the conventional backing
+instance variable as a fallback. A restoration failure is reported as
+`Scout::Testing::State::RestoreError` after all bindings and built-in state
+have had a restoration attempt; its `errors` array contains the failures. If
+this occurs while another exception is already propagating, the restore error
+retains that original exception in `original_error`.
+
+Additional bindings are for plain settings whose setter stores its value in
+`@<accessor>`. They are not a general rollback mechanism for setters with
+unrelated side effects. Directory creation rejects symlink components but is
+not a race-proof filesystem transaction; use a unique state root and avoid
+concurrent writers.
+
 The shared `test/test_helper.rb` may load both layers because the tests in this repository use both. A consumer that only needs generic filesystem helpers should require only `scout/testing`.
 
-Restoration of process-global state is not synchronization. Tests using this state-isolation mechanism must not run concurrently in the same Ruby process unless they provide additional synchronization. Separate processes or serialized execution are appropriate alternatives.
+Restoration of process-global state is not synchronization, including for
+caller-supplied bindings. Tests using this state-isolation mechanism must not
+run concurrently in the same Ruby process unless they provide additional
+synchronization. Separate processes or serialized execution are appropriate
+alternatives.
 
 ### Availability primitives
 
