@@ -142,6 +142,10 @@ module NamedArray
       new
     end
   end
+  
+  def zip_fields
+    NamedArray.zip_fields(self).collect{|v| self.annotate(v) }
+  end
 
   def self.add_zipped(source, new)
     source.zip(new).each do |s,n|
