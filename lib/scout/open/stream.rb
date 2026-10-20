@@ -54,10 +54,13 @@ module Open
 
         into_close = false unless into.respond_to? :close
 
-        while c = io.readpartial(BLOCK_SIZE)
-          into << c if into
-          last_c = c if c
-          break if io.closed?
+        begin
+          while c = io.readpartial(BLOCK_SIZE)
+            into << c if into
+            last_c = c if c
+            break if io.closed?
+          end
+        rescue EOFError
         end
 
         io.join if io.respond_to? :join
@@ -67,7 +70,6 @@ module Open
         block.call if block_given?
 
         last_c
-      rescue EOFError
       rescue Aborted
         Thread.current["exception"] = true
         Log.low "Consume stream Aborted #{Log.fingerprint io} into #{into_path || into}"
