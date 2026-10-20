@@ -16,7 +16,7 @@ module Open
     end
   end
 
-  def self.consume_stream(io, in_thread = false, into = nil, into_close = true, &block)
+  def self.consume_stream(io, in_thread = false, into = nil, into_close = true, clean = true, &block)
     return if Path === io
     return unless io.respond_to? :read
 
@@ -54,7 +54,7 @@ module Open
 
         into_close = false unless into.respond_to? :close
 
-        while c = io.read(BLOCK_SIZE)
+        while c = io.readpartial(BLOCK_SIZE)
           into << c if into
           last_c = c if c
           break if io.closed?
@@ -67,12 +67,13 @@ module Open
         block.call if block_given?
 
         last_c
+      rescue EOFError
       rescue Aborted
         Thread.current["exception"] = true
         Log.low "Consume stream Aborted #{Log.fingerprint io} into #{into_path || into}"
         io.abort $! if io.respond_to? :abort
         into.close if into.respond_to?(:closed?) && ! into.closed?
-        FileUtils.rm into_path if into_path and File.exist?(into_path)
+        FileUtils.rm into_path if into_path and clean and File.exist?(into_path)
       rescue Exception
         Thread.current["exception"] = true
         Log.low "Consume stream Exception reading #{Log.fingerprint io} into #{into_path || into} - #{$!.message}"
@@ -80,9 +81,7 @@ module Open
         io.abort exception if io.respond_to? :abort
         into.close if into.respond_to?(:closed?) && ! into.closed?
         into_path = into if into_path.nil? && String === into
-        if into_path and File.exist?(into_path)
-          FileUtils.rm into_path
-        end
+        FileUtils.rm into_path if into_path and clean and File.exist?(into_path)
         raise exception
       end
     end

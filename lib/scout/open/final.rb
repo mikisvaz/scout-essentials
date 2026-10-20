@@ -147,7 +147,7 @@ module Open
         info_file = file + '.info'
         if File.exist?(info_file) && defined?(Step)
           done = Persist.memory([info_file, File.mtime(info_file)], persist: true ) do
-            Persist.load(info_file, Step::SERIALIZER)[:done]
+            Step.load_info(info_file)[:done]
           end
           return done if done
         end

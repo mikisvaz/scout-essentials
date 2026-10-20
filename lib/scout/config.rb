@@ -129,6 +129,7 @@ module Scout::Config
       end
     end
 
+
     value = priorities.empty? ? default : priorities.collect{|p| p }.sort_by{|p,v| p}.first.last.first
     value = false if value == 'false'
 
