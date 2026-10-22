@@ -60,7 +60,7 @@ module Open
             last_c = c if c
             break if io.closed?
           end
-        rescue EOFError
+        rescue EOFError, IOError
         end
 
         io.join if io.respond_to? :join
