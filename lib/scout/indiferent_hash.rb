@@ -143,7 +143,7 @@ module IndiferentHash
     new
   end
 
-  def pretty_print
+  def pretty_print(obj=nil)
     Misc.format_definition_list(self, sep: "\n")
   end
 

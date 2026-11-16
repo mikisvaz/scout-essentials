@@ -68,12 +68,17 @@ module Misc
   def self.fast_file_md5(file, sample = 3_000_000)
     size = File.size(file)
     sample_txt = size.to_s << ":" 
-    File.open(file) do |f|
-      sample_txt << f.read(sample)
-      f.seek(size/2)
-      sample_txt << f.read(sample)
-      f.seek(size - sample - 1)
-      sample_txt << f.read(sample)
+    begin
+      File.open(file) do |f|
+        sample_txt << f.read(sample)
+        f.seek(size/2)
+        sample_txt << f.read(sample)
+        f.seek(size - sample - 1)
+        sample_txt << f.read(sample)
+      end
+    rescue
+      Log.exception $!
+      sample_txt = "Error sampling file: #{$!.message}"
     end
     Digest::MD5.hexdigest(sample_txt)
   end
