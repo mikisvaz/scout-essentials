@@ -70,6 +70,7 @@ scout-essentials=/$PWD filter="*.rb *.txt *.md *.conf *.yaml" {
     case_insensitive.rb
     options.rb
     serialize.rb
+    json.rb
    }
    log.rb
    log=log{
